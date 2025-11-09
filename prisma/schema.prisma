@@ -1,0 +1,80 @@
+// Prisma schema for user authentication
+// You must run npx prisma migrate dev after editing this file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Medecin {
+  id          Int          @id @default(autoincrement())
+  email       String       @unique
+  phoneNumber String       @unique
+  password    String
+  fullName    String       @unique
+  speciality  String
+  bio         String?
+  createdAt   DateTime     @default(now())
+  patients    Patient[]
+  rendezVous  RendezVous[]
+}
+
+enum Gender {
+  Homme
+  Femme
+}
+
+model Patient {
+  id               Int          @id @default(autoincrement())
+  phoneNumber      String       @unique
+  fullName         String       @unique
+  gender           Gender
+  poids            Float?
+  taille           Int?
+  maladieChronique String       @default("arthrose")
+  dateOfBirth      DateTime
+  bio              String?
+  createdAt        DateTime     @default(now())
+  medecinId        Int
+  medecin          Medecin      @relation(fields: [medecinId], references: [id])
+  rendezVous       RendezVous[]
+}
+
+enum RendezVousState {
+  Scheduled
+  Waiting
+  InProgress
+  Completed
+  Cancelled
+}
+
+model RendezVous {
+  id          Int             @id @default(autoincrement())
+  date        DateTime
+  patientId   Int
+  medecinId   Int
+  arrivalTime DateTime?
+  startTime   DateTime?
+  endTime     DateTime?
+  state       RendezVousState @default(Scheduled)
+
+  paid          Int     @default(0)
+  note          String?
+  poids         Float?
+  pcm           Float?
+  imc           Float?
+  pulse         Int?
+  paSystolique  Int?
+  paDiastolique Int?
+
+  patient Patient @relation(fields: [patientId], references: [id])
+  medecin Medecin @relation(fields: [medecinId], references: [id])
+
+  @@unique([patientId, medecinId, date])
+}
+
+

@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "RendezVous" ADD COLUMN     "note" TEXT,
+ADD COLUMN     "paid" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "poids" DOUBLE PRECISION;

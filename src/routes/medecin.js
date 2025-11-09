@@ -1,5 +1,5 @@
 import express from 'express';
-import { newPatient, listPatients, newRendezVous, test, listTodayAppointments, getPatientProfile, addToWaitingListToday, getCompletedAppointments, finishConsultation, cancelledApointment, addToWaitingList, addToInProgress } from '../controllers/medecinController.js';
+import { newPatient, listPatients, newRendezVous, test, listTodayAppointments, getPatientProfile, addToWaitingListToday, getCompletedAppointments, finishConsultation, cancelledApointment, addToWaitingList, addToInProgress, getBiologicalRequests, createBiologicalRequest, updateBiologicalRequest } from '../controllers/medecinController.js';
 import { verifyAccessToken } from '../middleware/verifyAccessToken.js';
 import { PrismaClient } from '@prisma/client';
 
@@ -19,7 +19,10 @@ router.get('/completed-appointments', verifyAccessToken, getCompletedAppointment
 router.get('/profile-patient/:id', verifyAccessToken, getPatientProfile)
 router.get('/test', test)
 
-
+// Biological request routes
+router.get('/biological-requests/:patientId', verifyAccessToken, getBiologicalRequests);
+router.post('/biological-requests', verifyAccessToken, createBiologicalRequest);
+router.put('/biological-requests/:requestId', verifyAccessToken, updateBiologicalRequest);
 
 
 export default router;

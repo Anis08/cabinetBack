@@ -11,16 +11,17 @@ datasource db {
 }
 
 model Medecin {
-  id          Int          @id @default(autoincrement())
-  email       String       @unique
-  phoneNumber String       @unique
-  password    String
-  fullName    String       @unique
-  speciality  String
-  bio         String?
-  createdAt   DateTime     @default(now())
-  patients    Patient[]
-  rendezVous  RendezVous[]
+  id                  Int                  @id @default(autoincrement())
+  email               String               @unique
+  phoneNumber         String               @unique
+  password            String
+  fullName            String               @unique
+  speciality          String
+  bio                 String?
+  createdAt           DateTime             @default(now())
+  patients            Patient[]
+  rendezVous          RendezVous[]
+  biologicalRequests  BiologicalRequest[]
 }
 
 enum Gender {
@@ -29,19 +30,20 @@ enum Gender {
 }
 
 model Patient {
-  id               Int          @id @default(autoincrement())
-  phoneNumber      String       @unique
-  fullName         String       @unique
-  gender           Gender
-  poids            Float?
-  taille           Int?
-  maladieChronique String       @default("arthrose")
-  dateOfBirth      DateTime
-  bio              String?
-  createdAt        DateTime     @default(now())
-  medecinId        Int
-  medecin          Medecin      @relation(fields: [medecinId], references: [id])
-  rendezVous       RendezVous[]
+  id                  Int                  @id @default(autoincrement())
+  phoneNumber         String               @unique
+  fullName            String               @unique
+  gender              Gender
+  poids               Float?
+  taille              Int?
+  maladieChronique    String               @default("arthrose")
+  dateOfBirth         DateTime
+  bio                 String?
+  createdAt           DateTime             @default(now())
+  medecinId           Int
+  medecin             Medecin              @relation(fields: [medecinId], references: [id])
+  rendezVous          RendezVous[]
+  biologicalRequests  BiologicalRequest[]
 }
 
 enum RendezVousState {
@@ -77,4 +79,25 @@ model RendezVous {
   @@unique([patientId, medecinId, date])
 }
 
+enum BiologicalRequestStatus {
+  EnCours
+  Completed
+}
+
+model BiologicalRequest {
+  id              Int                      @id @default(autoincrement())
+  requestNumber   String                   @unique @default(cuid())
+  patientId       Int
+  medecinId       Int
+  sampleTypes     String[] // Array of sample types (Sang, Urine, Selles, Autre)
+  requestedExams  String[] // Array of exam types
+  results         Json?    // JSON object with exam results { "examName": "value" }
+  status          BiologicalRequestStatus  @default(EnCours)
+  samplingDate    DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id])
+  medecin Medecin @relation(fields: [medecinId], references: [id])
+}
 

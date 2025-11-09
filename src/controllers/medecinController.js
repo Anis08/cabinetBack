@@ -613,3 +613,166 @@ export const getPatientProfile = async (req, res) => {
     console.error(err);
   }
 }
+
+
+// Get all biological requests for a patient
+export const getBiologicalRequests = async (req, res) => {
+  const medecinId = req.medecinId;
+  const patientId = req.params.patientId;
+
+  try {
+    if (!patientId) {
+      return res.status(400).json({ message: 'Patient ID is required' });
+    }
+
+    // Verify that the patient belongs to this medecin
+    const patient = await prisma.patient.findFirst({
+      where: {
+        id: parseInt(patientId),
+        medecinId: medecinId
+      }
+    });
+
+    if (!patient) {
+      return res.status(403).json({ message: 'Access denied: Patient does not belong to this medecin' });
+    }
+
+    const requests = await prisma.biologicalRequest.findMany({
+      where: {
+        patientId: parseInt(patientId),
+        medecinId: medecinId
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Map enum values to match frontend expectations
+    const formattedRequests = requests.map(request => ({
+      ...request,
+      status: request.status === 'EnCours' ? 'En cours' : 'Complété'
+    }));
+
+    res.status(200).json({ requests: formattedRequests });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to retrieve biological requests', error: err.message });
+    console.error(err);
+  }
+};
+
+
+// Create a new biological request
+export const createBiologicalRequest = async (req, res) => {
+  const medecinId = req.medecinId;
+  const { patientId, sampleTypes, requestedExams, status } = req.body;
+
+  try {
+    if (!patientId || !sampleTypes || !requestedExams || sampleTypes.length === 0 || requestedExams.length === 0) {
+      return res.status(400).json({ message: 'Patient ID, sample types, and requested exams are required' });
+    }
+
+    // Verify that the patient belongs to this medecin
+    const patient = await prisma.patient.findFirst({
+      where: {
+        id: parseInt(patientId),
+        medecinId: medecinId
+      }
+    });
+
+    if (!patient) {
+      return res.status(403).json({ message: 'Access denied: Patient does not belong to this medecin' });
+    }
+
+    // Map status from frontend to enum
+    const dbStatus = status === 'Complété' ? 'Completed' : 'EnCours';
+
+    const biologicalRequest = await prisma.biologicalRequest.create({
+      data: {
+        patientId: parseInt(patientId),
+        medecinId: medecinId,
+        sampleTypes: sampleTypes,
+        requestedExams: requestedExams,
+        status: dbStatus,
+        results: {}
+      }
+    });
+
+    // Format response to match frontend expectations
+    const formattedRequest = {
+      ...biologicalRequest,
+      status: biologicalRequest.status === 'EnCours' ? 'En cours' : 'Complété'
+    };
+
+    res.status(201).json({ request: formattedRequest, message: 'Biological request created successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to create biological request', error: err.message });
+    console.error(err);
+  }
+};
+
+
+// Update biological request results
+export const updateBiologicalRequest = async (req, res) => {
+  const medecinId = req.medecinId;
+  const requestId = req.params.requestId;
+  const { patientId, results, status, samplingDate } = req.body;
+
+  try {
+    if (!requestId) {
+      return res.status(400).json({ message: 'Request ID is required' });
+    }
+
+    // Verify that the request exists and belongs to this medecin
+    const existingRequest = await prisma.biologicalRequest.findFirst({
+      where: {
+        id: parseInt(requestId),
+        medecinId: medecinId
+      }
+    });
+
+    if (!existingRequest) {
+      return res.status(404).json({ message: 'Biological request not found or access denied' });
+    }
+
+    // Verify patient ownership if patientId is provided
+    if (patientId) {
+      const patient = await prisma.patient.findFirst({
+        where: {
+          id: parseInt(patientId),
+          medecinId: medecinId
+        }
+      });
+
+      if (!patient) {
+        return res.status(403).json({ message: 'Access denied: Patient does not belong to this medecin' });
+      }
+    }
+
+    // Map status from frontend to enum
+    const dbStatus = status === 'Complété' ? 'Completed' : 'EnCours';
+
+    // Prepare update data
+    const updateData = {};
+    if (results !== undefined) updateData.results = results;
+    if (status !== undefined) updateData.status = dbStatus;
+    if (samplingDate !== undefined) updateData.samplingDate = samplingDate ? new Date(samplingDate) : null;
+
+    const updatedRequest = await prisma.biologicalRequest.update({
+      where: {
+        id: parseInt(requestId)
+      },
+      data: updateData
+    });
+
+    // Format response to match frontend expectations
+    const formattedRequest = {
+      ...updatedRequest,
+      status: updatedRequest.status === 'EnCours' ? 'En cours' : 'Complété'
+    };
+
+    res.status(200).json({ request: formattedRequest, message: 'Biological request updated successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update biological request', error: err.message });
+    console.error(err);
+  }
+};

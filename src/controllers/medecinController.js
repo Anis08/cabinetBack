@@ -467,6 +467,8 @@ export const getCompletedAppointments = async (req, res) => {
           startTime: true,
           endTime: true,
           date: true,
+          state: true,
+          patientId: true,
           paid: true,
           note: true,
           poids: true,
@@ -577,6 +579,8 @@ export const getCompletedAppointments = async (req, res) => {
         date: apt.date,
         startTime: apt.startTime,
         endTime: apt.endTime,
+        state: apt.state, // Include actual state from database
+        patientId: apt.patientId, // Include patientId for frontend compatibility
         patient: {
           id: apt.patient.id,
           fullName: apt.patient.fullName,

@@ -796,6 +796,129 @@ export const getCompletedAppointmentsGrouped = async (req, res) => {
 }
 
 
+export const getHistory = async (req, res) => {
+  const medecinId = req.medecinId;
+  try {
+    // Fetch ALL completed appointments for history view
+    const appointments = await prisma.rendezVous.findMany({
+      where: {
+        medecinId: medecinId,
+        state: 'Completed'
+      },
+      select: {
+        id: true,
+        startTime: true,
+        endTime: true,
+        date: true,
+        state: true,
+        patientId: true,
+        paid: true,
+        note: true,
+        poids: true,
+        pcm: true,
+        imc: true,
+        pulse: true,
+        paSystolique: true,
+        paDiastolique: true,
+        teleconsultation: true,
+        patient: {
+          select: {
+            id: true,
+            fullName: true,
+            maladieChronique: true,
+            poids: true,
+            taille: true,
+          }
+        }
+      },
+      orderBy: {
+        date: 'desc'
+      }
+    });
+
+    // Get biological requests for all patients
+    const patientIds = [...new Set(appointments.map(apt => apt.patient.id))];
+    const biologicalRequests = await prisma.biologicalRequest.findMany({
+      where: {
+        medecinId,
+        patientId: { in: patientIds }
+      },
+      select: {
+        id: true,
+        patientId: true,
+        requestedExams: true,
+        results: true,
+        status: true,
+        samplingDate: true,
+        createdAt: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Format appointments with enriched data
+    const formattedAppointments = appointments.map(apt => {
+      // Format vital signs
+      const vitalSigns = {};
+      if (apt.paSystolique) vitalSigns.bloodPressureSystolic = apt.paSystolique;
+      if (apt.paDiastolique) vitalSigns.bloodPressureDiastolic = apt.paDiastolique;
+      if (apt.pulse) vitalSigns.heartRate = apt.pulse;
+      if (apt.poids) vitalSigns.weight = apt.poids;
+      if (apt.patient.taille) vitalSigns.height = apt.patient.taille;
+      if (apt.imc) vitalSigns.bmi = apt.imc;
+      if (apt.pcm) vitalSigns.pcm = apt.pcm;
+
+      // Get biological tests for this patient
+      const patientBioRequests = biologicalRequests.filter(br => br.patientId === apt.patient.id);
+      const biologicalTests = [];
+      
+      patientBioRequests.forEach(request => {
+        request.requestedExams.forEach(exam => {
+          const status = request.status === 'Completed' ? 'reçue' : 
+                        request.status === 'EnCours' ? 'en attente' : 'demandée';
+          const result = request.results && request.results[exam] ? request.results[exam] : null;
+          
+          biologicalTests.push({
+            test: exam,
+            status: status,
+            date: request.createdAt,
+            result: result
+          });
+        });
+      });
+
+      return {
+        id: apt.id,
+        date: apt.date,
+        startTime: apt.startTime,
+        endTime: apt.endTime,
+        state: apt.state,
+        patientId: apt.patientId,
+        teleconsultation: apt.teleconsultation || false,
+        patient: {
+          id: apt.patient.id,
+          fullName: apt.patient.fullName,
+          maladieChronique: apt.patient.maladieChronique
+        },
+        motif: 'Consultation',
+        note: apt.note || null,
+        vitalSigns: Object.keys(vitalSigns).length > 0 ? vitalSigns : null,
+        biologicalTests: biologicalTests.length > 0 ? biologicalTests : null,
+        documents: []
+      };
+    });
+
+    res.status(200).json({
+      appointments: formattedAppointments
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch history', error: err.message });
+    console.error(err);
+  }
+}
+
+
 export const addToWaitingListToday = async (req, res) =>  {
   const medecinId = req.medecinId;
   const { patientId } = req.body;

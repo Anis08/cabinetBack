@@ -608,6 +608,194 @@ export const getCompletedAppointments = async (req, res) => {
 }
 
 
+export const getCompletedAppointmentsGrouped = async (req, res) => {
+  const medecinId = req.medecinId;
+  try {
+    // Prepare date ranges
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay());
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 7);
+
+    // Run all queries in parallel
+    const [
+      completedApointments,
+      todayRevenue,
+      weekRevenue,
+      avgPaid
+    ] = await Promise.all([
+      prisma.rendezVous.findMany({
+        where: {
+          AND: [
+            { medecinId: medecinId },
+            { state: 'Completed' }
+          ]
+        },
+        select: {
+          id: true,
+          startTime: true,
+          endTime: true,
+          date: true,
+          state: true,
+          patientId: true,
+          paid: true,
+          note: true,
+          poids: true,
+          pcm: true,
+          imc: true,
+          pulse: true,
+          paSystolique: true,
+          paDiastolique: true,
+          patient: {
+            select: {
+              id: true,
+              fullName: true,
+              maladieChronique: true,
+              poids: true,
+              taille: true,
+            }
+          }
+        },
+        orderBy: {
+          date: 'desc'
+        }
+      }),
+      prisma.rendezVous.aggregate({
+        _sum: { paid: true },
+        where: {
+          medecinId,
+          state: 'Completed',
+          date: {
+            gte: today,
+            lt: tomorrow
+          }
+        }
+      }),
+      prisma.rendezVous.aggregate({
+        _sum: { paid: true },
+        where: {
+          medecinId,
+          state: 'Completed',
+          date: {
+            gte: weekStart,
+            lt: weekEnd
+          }
+        }
+      }),
+      prisma.rendezVous.aggregate({
+        _avg: { paid: true },
+        where: {
+          medecinId,
+          state: 'Completed'
+        }
+      })
+    ]);
+
+    // Get biological requests for all patients in completed appointments
+    const patientIds = [...new Set(completedApointments.map(apt => apt.patient.id))];
+    const biologicalRequests = await prisma.biologicalRequest.findMany({
+      where: {
+        medecinId,
+        patientId: { in: patientIds }
+      },
+      select: {
+        id: true,
+        patientId: true,
+        requestedExams: true,
+        results: true,
+        status: true,
+        samplingDate: true,
+        createdAt: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Format appointments with enriched data
+    const formattedAppointments = completedApointments.map(apt => {
+      // Format vital signs
+      const vitalSigns = {};
+      if (apt.paSystolique) vitalSigns.bloodPressureSystolic = apt.paSystolique;
+      if (apt.paDiastolique) vitalSigns.bloodPressureDiastolic = apt.paDiastolique;
+      if (apt.pulse) vitalSigns.heartRate = apt.pulse;
+      if (apt.poids) vitalSigns.weight = apt.poids;
+      if (apt.patient.taille) vitalSigns.height = apt.patient.taille;
+      if (apt.imc) vitalSigns.bmi = apt.imc;
+      if (apt.pcm) vitalSigns.pcm = apt.pcm;
+
+      // Get biological tests for this patient around this consultation date
+      const patientBioRequests = biologicalRequests.filter(br => br.patientId === apt.patient.id);
+      const biologicalTests = [];
+      
+      patientBioRequests.forEach(request => {
+        request.requestedExams.forEach(exam => {
+          const status = request.status === 'Completed' ? 'reçue' : 
+                        request.status === 'EnCours' ? 'en attente' : 'demandée';
+          const result = request.results && request.results[exam] ? request.results[exam] : null;
+          
+          biologicalTests.push({
+            test: exam,
+            status: status,
+            date: request.createdAt,
+            result: result
+          });
+        });
+      });
+
+      return {
+        id: apt.id,
+        date: apt.date,
+        startTime: apt.startTime,
+        endTime: apt.endTime,
+        state: apt.state,
+        patientId: apt.patientId,
+        patient: {
+          id: apt.patient.id,
+          fullName: apt.patient.fullName,
+          maladieChronique: apt.patient.maladieChronique
+        },
+        motif: 'Consultation',
+        statut: 'termine',
+        clinicalSummary: apt.note || null,
+        vitalSigns: Object.keys(vitalSigns).length > 0 ? vitalSigns : null,
+        biologicalTests: biologicalTests.length > 0 ? biologicalTests : null,
+        documents: []
+      };
+    });
+
+    // Group appointments by date
+    const grouped = formattedAppointments.reduce((acc, rdv) => {
+      // Format date as YYYY-MM-DD for grouping
+      const dateKey = rdv.date instanceof Date 
+        ? rdv.date.toISOString().split('T')[0]
+        : new Date(rdv.date).toISOString().split('T')[0];
+      
+      if (!acc[dateKey]) {
+        acc[dateKey] = [];
+      }
+      acc[dateKey].push(rdv);
+      return acc;
+    }, {});
+
+    res.status(200).json({
+      completedApointments: grouped,
+      todayRevenue: todayRevenue._sum.paid || 0,
+      weekRevenue: weekRevenue._sum.paid || 0,
+      averagePaid: Math.round(avgPaid._avg.paid) || 0
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to list grouped appointments', error: err.message });
+    console.error(err);
+  }
+}
+
+
 export const addToWaitingListToday = async (req, res) =>  {
   const medecinId = req.medecinId;
   const { patientId } = req.body;

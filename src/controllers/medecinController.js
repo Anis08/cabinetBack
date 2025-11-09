@@ -776,3 +776,47 @@ export const updateBiologicalRequest = async (req, res) => {
     console.error(err);
   }
 };
+
+
+// Get all appointments for the medecin (for calendar view)
+export const getAllAppointments = async (req, res) => {
+  const medecinId = req.medecinId;
+
+  try {
+    const appointments = await prisma.rendezVous.findMany({
+      where: {
+        medecinId: medecinId
+      },
+      orderBy: {
+        date: 'asc'
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            fullName: true,
+            phoneNumber: true
+          }
+        }
+      }
+    });
+
+    res.status(200).json({ 
+      appointments: appointments.map(apt => ({
+        id: apt.id,
+        date: apt.date,
+        patientId: apt.patientId,
+        medecinId: apt.medecinId,
+        state: apt.state,
+        arrivalTime: apt.arrivalTime,
+        startTime: apt.startTime,
+        endTime: apt.endTime,
+        createdAt: apt.createdAt,
+        patient: apt.patient
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to retrieve appointments', error: err.message });
+    console.error(err);
+  }
+};

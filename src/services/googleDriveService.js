@@ -71,10 +71,11 @@ export const uploadToGoogleDrive = async (fileBuffer, fileName, mimeType) => {
 
     // Upload file
     const response = await drive.files.create({
-      requestBody: fileMetadata,
-      media: media,
-      fields: 'id, name, mimeType, webViewLink, webContentLink'
-    });
+  requestBody: fileMetadata,
+  media: media,
+  fields: 'id, name, mimeType, webViewLink, webContentLink',
+  supportsAllDrives: true 
+});
 
     // Make file publicly accessible
     await drive.permissions.create({

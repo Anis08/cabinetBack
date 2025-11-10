@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 package-lock.json
+config/google-service-account.json
 
 # Environment variables
 .env

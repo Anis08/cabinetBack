@@ -987,6 +987,22 @@ export const getPatientProfile = async (req, res) => {
         createdAt: true,
         rendezVous: {
           where: { state: 'Completed' },
+          select: {
+            id: true,
+            date: true,
+            startTime: true,
+            endTime: true,
+            state: true,
+            arrivalTime: true,
+            paid: true,
+            note: true,
+            poids: true,
+            pcm: true,
+            imc: true,
+            pulse: true,
+            paSystolique: true,
+            paDiastolique: true
+          },
           orderBy: {
             date: 'desc'
           }

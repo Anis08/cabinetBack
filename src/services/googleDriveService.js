@@ -4,35 +4,45 @@ import path from 'path';
 import { Readable } from 'stream';
 
 /**
- * Initialize Google Drive API with service account or OAuth credentials
+ * Initialize Google Drive API with OAuth credentials
  */
 const initializeDrive = () => {
   try {
-    // Check if SERVICE_ACCOUNT_KEY is provided (preferred method)
-    if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+    // Use OAuth2 client with refresh token
+    if (process.env.GOOGLE_CLIENT_ID && 
+        process.env.GOOGLE_CLIENT_SECRET && 
+        process.env.GOOGLE_REFRESH_TOKEN) {
+      
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        'http://localhost' // Redirect URL (not used for refresh token flow)
+      );
+
+      oauth2Client.setCredentials({
+        refresh_token: process.env.GOOGLE_REFRESH_TOKEN
+      });
+
+      return google.drive({ version: 'v3', auth: oauth2Client });
+    }
+
+    // Fallback: Service account with domain-wide delegation (requires Workspace)
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY && process.env.GOOGLE_USER_EMAIL) {
       const serviceAccountKey = JSON.parse(
         Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString()
       );
 
-      const auth = new google.auth.GoogleAuth({
-        credentials: serviceAccountKey,
-        scopes: ['https://www.googleapis.com/auth/drive.file']
+      const auth = new google.auth.JWT({
+        email: serviceAccountKey.client_email,
+        key: serviceAccountKey.private_key,
+        scopes: ['https://www.googleapis.com/auth/drive.file'],
+        subject: process.env.GOOGLE_USER_EMAIL // Impersonate this user
       });
 
       return google.drive({ version: 'v3', auth });
     }
 
-    // Fallback to service account file path
-    if (process.env.GOOGLE_SERVICE_ACCOUNT_PATH) {
-      const auth = new google.auth.GoogleAuth({
-        keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_PATH,
-        scopes: ['https://www.googleapis.com/auth/drive.file']
-      });
-
-      return google.drive({ version: 'v3', auth });
-    }
-
-    throw new Error('Google Drive credentials not configured');
+    throw new Error('Google Drive credentials not configured. Please set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN');
   } catch (error) {
     console.error('Error initializing Google Drive:', error);
     throw error;

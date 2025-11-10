@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import prisma from "../prisma.js";
 import { startOfDay } from 'date-fns';
 import { da } from 'date-fns/locale';
+import { triggerWaitingLineUpdate } from '../services/websocketService.js';
 
 
 
@@ -258,6 +259,9 @@ export const addToWaitingList = async (req, res) => {
 
     })
 
+    // Trigger WebSocket update for public waiting line
+    triggerWaitingLineUpdate();
+
     res.status(200).json({ state: 'Waiting' });
   } catch (err) {
 
@@ -308,6 +312,9 @@ export const addToInProgress = async (req, res) => {
       }
 
     })
+
+    // Trigger WebSocket update for public waiting line
+    triggerWaitingLineUpdate();
 
     res.status(200).json({ state: 'InProgress' });
   } catch (err) {
@@ -422,6 +429,9 @@ export const finishConsultation = async (req, res) => {
       });
 
     }
+
+    // Trigger WebSocket update for public waiting line
+    triggerWaitingLineUpdate();
 
     res.status(200).json({ message: 'Consultation finished', completed });
 
@@ -941,6 +951,9 @@ export const addToWaitingListToday = async (req, res) =>  {
         }
       }
     )
+
+    // Trigger WebSocket update for public waiting line
+    triggerWaitingLineUpdate();
 
     res.status(200).json({ rendezVous });
   } catch (err) {

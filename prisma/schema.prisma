@@ -22,6 +22,7 @@ model Medecin {
   patients            Patient[]
   rendezVous          RendezVous[]
   biologicalRequests  BiologicalRequest[]
+  advertisements      Advertisement[]
 }
 
 enum Gender {
@@ -98,6 +99,33 @@ model BiologicalRequest {
   updatedAt       DateTime                 @updatedAt
 
   patient Patient @relation(fields: [patientId], references: [id])
+  medecin Medecin @relation(fields: [medecinId], references: [id])
+}
+
+enum AdType {
+  image
+  video
+}
+
+enum AdPosition {
+  top
+  bottom
+}
+
+model Advertisement {
+  id          Int         @id @default(autoincrement())
+  medecinId   Int
+  title       String
+  type        AdType
+  fileUrl     String
+  dateFrom    DateTime
+  dateTo      DateTime
+  duration    Int         @default(5) // seconds
+  position    AdPosition  @default(top)
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
   medecin Medecin @relation(fields: [medecinId], references: [id])
 }
 

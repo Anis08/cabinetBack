@@ -1,14 +1,20 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.js';
 import medecinRoutes from './routes/medecin.js';
 import adminRoutes from './routes/admin.js';
 import publicRoutes from './routes/public.js';
+import adsRoutes from './routes/ads.js';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { initializeWebSocket } from './services/websocketService.js';
 
+// Get __dirname in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -22,7 +28,11 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json());
 
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 app.use('/auth', authRoutes);
+app.use('/medecin/ads', adsRoutes);
 app.use('/medecin', medecinRoutes);
 app.use('/admin', adminRoutes);
 app.use('/public', publicRoutes);

@@ -1,30 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+import { 
+  uploadToGoogleDrive, 
+  deleteFromGoogleDrive, 
+  extractFileIdFromUrl 
+} from '../services/googleDriveService.js';
 
 const prisma = new PrismaClient();
 
-// Get __dirname in ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../../uploads/ads');
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'ad-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+// Configure multer for memory storage (we'll upload to Google Drive)
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   // Accept images and videos
@@ -260,16 +246,17 @@ export const deleteAd = async (req, res) => {
       return res.status(404).json({ message: 'Advertisement not found' });
     }
 
-    // Delete file from filesystem if exists
+    // Delete file from Google Drive if exists
     if (existingAd.fileUrl) {
-      const fileName = path.basename(existingAd.fileUrl);
-      const filePath = path.join(__dirname, '../../uploads/ads', fileName);
+      const fileId = extractFileIdFromUrl(existingAd.fileUrl);
       
-      if (fs.existsSync(filePath)) {
+      if (fileId) {
         try {
-          fs.unlinkSync(filePath);
+          await deleteFromGoogleDrive(fileId);
+          console.log(`Deleted file from Google Drive: ${fileId}`);
         } catch (err) {
-          console.error('Error deleting file:', err);
+          console.error('Error deleting file from Google Drive:', err);
+          // Continue with database deletion even if Drive deletion fails
         }
       }
     }
@@ -295,7 +282,7 @@ export const deleteAd = async (req, res) => {
 };
 
 /**
- * Handle file upload
+ * Handle file upload to Google Drive
  */
 export const uploadAdFile = async (req, res) => {
   try {
@@ -303,13 +290,26 @@ export const uploadAdFile = async (req, res) => {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    // Construct the file URL
-    const fileUrl = `/uploads/ads/${req.file.filename}`;
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomStr = Math.round(Math.random() * 1E9);
+    const fileExtension = path.extname(req.file.originalname);
+    const uniqueFileName = `ad-${timestamp}-${randomStr}${fileExtension}`;
+
+    // Upload to Google Drive
+    const uploadResult = await uploadToGoogleDrive(
+      req.file.buffer,
+      uniqueFileName,
+      req.file.mimetype
+    );
 
     res.status(200).json({
-      message: 'File uploaded successfully',
-      url: fileUrl,
-      filename: req.file.filename,
+      message: 'File uploaded successfully to Google Drive',
+      url: uploadResult.url,
+      fileId: uploadResult.fileId,
+      directLink: uploadResult.directLink,
+      webViewLink: uploadResult.webViewLink,
+      filename: uniqueFileName,
       mimetype: req.file.mimetype,
       size: req.file.size
     });
@@ -317,7 +317,7 @@ export const uploadAdFile = async (req, res) => {
   } catch (error) {
     console.error('Error uploading file:', error);
     res.status(500).json({
-      message: 'Failed to upload file',
+      message: 'Failed to upload file to Google Drive',
       error: error.message
     });
   }

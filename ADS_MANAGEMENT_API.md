@@ -133,13 +133,18 @@ curl -X POST http://localhost:4000/medecin/ads/upload \
 #### Response (200 OK)
 ```json
 {
-  "message": "File uploaded successfully",
-  "url": "/uploads/ads/ad-1234567890.jpg",
+  "message": "File uploaded successfully to Google Drive",
+  "url": "https://drive.google.com/uc?export=view&id=FILE_ID",
+  "fileId": "1abc123def456ghi789",
+  "directLink": "https://drive.google.com/uc?export=view&id=FILE_ID",
+  "webViewLink": "https://drive.google.com/file/d/FILE_ID/view",
   "filename": "ad-1234567890.jpg",
   "mimetype": "image/jpeg",
   "size": 245678
 }
 ```
+
+**Note:** Files are now stored in **Google Drive** instead of local storage. See `GOOGLE_DRIVE_SETUP.md` for configuration.
 
 ---
 

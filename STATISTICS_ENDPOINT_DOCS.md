@@ -49,7 +49,6 @@ No request body required.
       "semaine": 48,
       "mois": 185,
       "presentiel": 165,
-      "teleconsultation": 20,
       "dureeeMoyenne": 23,
       "urgences": 12,
       "tempsAttenteMoyen": 15
@@ -139,7 +138,6 @@ No request body required.
 | `semaine` | Integer | Consultations this week |
 | `mois` | Integer | Consultations this month |
 | `presentiel` | Integer | In-person consultations (89%) |
-| `teleconsultation` | Integer | Telemedicine consultations (11%) |
 | `dureeeMoyenne` | Integer | Average consultation duration (minutes) |
 | `urgences` | Integer | Emergency consultations (6%) |
 | `tempsAttenteMoyen` | Integer | Average waiting time (minutes) |

@@ -830,7 +830,6 @@ export const getHistory = async (req, res) => {
         pulse: true,
         paSystolique: true,
         paDiastolique: true,
-        teleconsultation: true,
         patient: {
           select: {
             id: true,
@@ -905,7 +904,6 @@ export const getHistory = async (req, res) => {
         endTime: apt.endTime,
         state: apt.state,
         patientId: apt.patientId,
-        teleconsultation: apt.teleconsultation || false,
         patient: {
           id: apt.patient.id,
           fullName: apt.patient.fullName,
@@ -1425,8 +1423,7 @@ export const getStatistics = async (req, res) => {
         jour: todayCompletedCount,
         semaine: weekAppointments.filter(apt => apt.state === 'Completed').length,
         mois: monthAppointments.filter(apt => apt.state === 'Completed').length,
-        presentiel: Math.round(totalCompletedConsultations * 0.89),
-        teleconsultation: Math.round(totalCompletedConsultations * 0.11),
+        presentiel: totalCompletedConsultations,
         dureeeMoyenne: avgDuration,
         urgences: Math.round(totalCompletedConsultations * 0.06),
         tempsAttenteMoyen: 15

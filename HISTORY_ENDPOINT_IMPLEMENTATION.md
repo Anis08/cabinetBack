@@ -17,7 +17,6 @@ Successfully implemented the `/medecin/history` endpoint to support the new Hist
 #### Key Features:
 - Fetches ALL completed appointments for the authenticated medecin
 - Returns data in **flat array format** (not grouped)
-- Includes **teleconsultation** boolean field
 - Enriched with **vital signs** data
 - Enriched with **biological tests** data
 - Sorted by **date descending** (newest first)
@@ -93,7 +92,6 @@ Authorization: Bearer <access_token>
       "endTime": "2024-01-15T09:30:00.000Z",
       "state": "Completed",
       "patientId": 456,
-      "teleconsultation": false,
       "patient": {
         "id": 456,
         "fullName": "John Doe",
@@ -150,11 +148,9 @@ The endpoint is designed to work with a sophisticated React component that featu
    - Shows formatted date headers
 
 5. **Type Filter**
-   - Filter by teleconsultation vs regular consultations
 
 6. **Weekly Insights**
    - Calculates statistics from visible appointments
-   - Shows total consultations, teleconsultations, etc.
 
 ### Why Client-Side Processing?
 
@@ -195,7 +191,6 @@ await prisma.rendezVous.findMany({
     pulse: true,
     paSystolique: true,
     paDiastolique: true,
-    teleconsultation: true,
     patient: {
       select: {
         id: true,
@@ -253,7 +248,6 @@ await prisma.biologicalRequest.findMany({
 ### `/medecin/history` (NEW)
 - **Purpose:** Comprehensive history with infinite scroll
 - **Format:** Flat array
-- **Fields:** All data + teleconsultation flag
 - **Use Case:** Advanced history component with filtering and search
 
 ---
@@ -266,7 +260,6 @@ feat(history): add history endpoint with infinite scroll support
 
 - Add getHistory() controller function in medecinController.js
 - Returns flat array of all completed appointments
-- Includes teleconsultation field for filtering
 - Enriched with vital signs and biological tests
 - Add /medecin/history route with JWT authentication
 - Supports infinite scroll and client-side filtering
@@ -306,7 +299,6 @@ Commit: f04f253
 
 - [ ] **Data Format Test**
   - Verify flat array structure
-  - Check teleconsultation field exists
   - Verify vital signs mapping
   - Verify biological tests formatting
 
@@ -318,7 +310,6 @@ Commit: f04f253
 - [ ] Infinite scroll works correctly
 - [ ] Search filters appointments instantly
 - [ ] Date range filter works
-- [ ] Type filter (teleconsultation) works
 - [ ] Grouping by date displays correctly
 - [ ] Weekly insights calculate correctly
 
@@ -450,7 +441,6 @@ useEffect(() => {
 - [x] Controller function implemented correctly
 - [x] Route configured with authentication
 - [x] Returns flat array format
-- [x] Includes teleconsultation field
 - [x] Vital signs properly mapped
 - [x] Biological tests formatted correctly
 - [x] Sorted by date descending

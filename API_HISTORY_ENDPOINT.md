@@ -34,7 +34,6 @@ None required - the endpoint returns ALL completed appointments for client-side 
       "endTime": "2024-01-15T09:30:00.000Z",
       "state": "Completed",
       "patientId": 456,
-      "teleconsultation": false,
       "patient": {
         "id": 456,
         "fullName": "John Doe",
@@ -77,7 +76,6 @@ None required - the endpoint returns ALL completed appointments for client-side 
 - `endTime` (ISO string): Appointment end time
 - `state` (string): Always "Completed" for this endpoint
 - `patientId` (number): Patient identifier
-- `teleconsultation` (boolean): Whether this was a teleconsultation
 - `patient` (object): Patient information
   - `id` (number): Patient identifier
   - `fullName` (string): Patient's full name
@@ -187,7 +185,6 @@ const fetchHistory = async () => {
 2. **Search**: Filters by patient name (client-side)
 3. **Date Range**: Filters by date range (client-side)
 4. **Grouping**: Groups by date (client-side)
-5. **Type Filter**: Filters by teleconsultation vs regular
 6. **Weekly Insights**: Calculates stats from visible appointments
 
 ### Performance Considerations
@@ -211,7 +208,6 @@ prisma.rendezVous.findMany({
   select: {
     id, startTime, endTime, date, state, patientId, paid, note,
     poids, pcm, imc, pulse, paSystolique, paDiastolique,
-    teleconsultation,
     patient: {
       select: { id, fullName, maladieChronique, poids, taille }
     }
@@ -240,7 +236,6 @@ prisma.biologicalRequest.findMany({
 ## Differences from Other Endpoints
 
 ### vs `/medecin/completed-appointments`
-- **History**: Returns flat array, includes teleconsultation field
 - **Completed**: Returns flat array, basic format
 
 ### vs `/medecin/completed-appointments-grouped`
@@ -327,5 +322,4 @@ curl -X GET http://localhost:3000/medecin/history \
 - Initial implementation
 - Returns all completed appointments
 - Includes vital signs and biological tests
-- Supports teleconsultation field
 - Ordered by date descending

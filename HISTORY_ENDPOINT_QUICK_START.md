@@ -69,7 +69,6 @@ useEffect(() => {
       "endTime": "2024-01-15T09:30:00.000Z",
       "state": "Completed",
       "patientId": 456,
-      "teleconsultation": false,
       "patient": {
         "id": 456,
         "fullName": "John Doe",
@@ -133,8 +132,6 @@ const filtered = appointments.filter(apt => {
   return aptDate >= startDate && aptDate <= endDate;
 });
 
-// Filter by teleconsultation
-const teleOnly = appointments.filter(apt => apt.teleconsultation);
 ```
 
 ### 5. Client-Side Grouping Ready

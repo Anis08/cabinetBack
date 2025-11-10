@@ -7,6 +7,6 @@ const router = express.Router();
 // Public endpoints - no authentication required
 router.get('/waiting-line', getWaitingLine);
 router.get('/waiting-line/stats', getWaitingLineStats);
-router.get('/ads', getActiveAds);
+router.get('/ads/active', getActiveAds);
 
 export default router;

@@ -349,7 +349,10 @@ export const getActiveAds = async (req, res) => {
         type: true,
         fileUrl: true,
         duration: true,
-        position: true
+        position: true,
+        dateFrom: true,
+        dateTo: true,
+        active: true
       }
     });
 

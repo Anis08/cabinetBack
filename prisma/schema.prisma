@@ -37,14 +37,17 @@ model Patient {
   gender              Gender
   poids               Float?
   taille              Int?
+  email               String?
+  address             String?
   maladieChronique    String               @default("arthrose")
   dateOfBirth         DateTime
   bio                 String?
   createdAt           DateTime             @default(now())
   medecinId           Int
-  medecin             Medecin              @relation(fields: [medecinId], references: [id])
+  medecin             Medecin              @relation(fields: [medecinId], references: [id], onDelete: Cascade)
   rendezVous          RendezVous[]
   biologicalRequests  BiologicalRequest[]
+  complementaryExams  ComplementaryExam[]
 }
 
 enum RendezVousState {
@@ -127,5 +130,30 @@ model Advertisement {
   updatedAt   DateTime    @updatedAt
 
   medecin Medecin @relation(fields: [medecinId], references: [id])
+}
+
+model ComplementaryExam {
+  id          Int         @id @default(autoincrement())
+  patientId   Int
+  type        String      // Type of exam (Échographie rénale, Scanner/IRM, etc.)
+  description String      @db.Text
+  date        DateTime
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  patient     Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  files       ExamFile[]
+}
+
+model ExamFile {
+  id        Int      @id @default(autoincrement())
+  examId    Int
+  fileName  String
+  fileUrl   String
+  fileType  String   // MIME type
+  fileSize  Int      // Size in bytes
+  uploadDate DateTime @default(now())
+  
+  exam      ComplementaryExam @relation(fields: [examId], references: [id], onDelete: Cascade)
 }
 

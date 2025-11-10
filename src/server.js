@@ -8,6 +8,7 @@ import medecinRoutes from './routes/medecin.js';
 import adminRoutes from './routes/admin.js';
 import publicRoutes from './routes/public.js';
 import adsRoutes from './routes/ads.js';
+import complementaryExamsRoutes from './routes/complementaryExams.js';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { initializeWebSocket } from './services/websocketService.js';
@@ -33,6 +34,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use('/auth', authRoutes);
 app.use('/medecin/ads', adsRoutes);
+app.use('/medecin/complementary-exams', complementaryExamsRoutes);
 app.use('/medecin', medecinRoutes);
 app.use('/admin', adminRoutes);
 app.use('/public', publicRoutes);

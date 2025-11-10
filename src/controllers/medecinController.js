@@ -980,6 +980,8 @@ export const getPatientProfile = async (req, res) => {
         id: true,
         fullName: true,
         phoneNumber: true,
+        email: true,
+        address: true,
         gender: true,
         poids: true,
         taille: true,
@@ -1034,6 +1036,105 @@ export const getPatientProfile = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to list patients', error: err.message });
+    console.error(err);
+  }
+}
+
+// Update patient information
+export const updatePatient = async (req, res) => {
+  const medecinId = req.medecinId;
+  const patientId = req.params.id;
+  const { fullName, dateOfBirth, gender, phoneNumber, email, address, maladieChronique } = req.body;
+
+  try {
+    // Verify that patient belongs to this medecin
+    const existingPatient = await prisma.patient.findFirst({
+      where: {
+        id: parseInt(patientId),
+        medecinId: medecinId
+      }
+    });
+
+    if (!existingPatient) {
+      return res.status(404).json({ message: 'Patient not found or does not belong to this doctor' });
+    }
+
+    // Validate required fields
+    if (!fullName || !dateOfBirth || !gender) {
+      return res.status(400).json({ message: 'Full name, date of birth, and gender are required' });
+    }
+
+    // Update patient
+    const updatedPatient = await prisma.patient.update({
+      where: {
+        id: parseInt(patientId)
+      },
+      data: {
+        fullName,
+        dateOfBirth: new Date(dateOfBirth),
+        gender,
+        phoneNumber: phoneNumber || existingPatient.phoneNumber,
+        email: email || null,
+        address: address || null,
+        maladieChronique: maladieChronique || existingPatient.maladieChronique
+      },
+      select: {
+        id: true,
+        fullName: true,
+        phoneNumber: true,
+        email: true,
+        address: true,
+        gender: true,
+        dateOfBirth: true,
+        maladieChronique: true,
+        createdAt: true
+      }
+    });
+
+    res.status(200).json({ 
+      message: 'Patient updated successfully',
+      patient: updatedPatient 
+    });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ message: 'Phone number or full name already exists' });
+    }
+    res.status(500).json({ message: 'Failed to update patient', error: err.message });
+    console.error(err);
+  }
+}
+
+// Delete patient
+export const deletePatient = async (req, res) => {
+  const medecinId = req.medecinId;
+  const patientId = req.params.id;
+
+  try {
+    // Verify that patient belongs to this medecin
+    const existingPatient = await prisma.patient.findFirst({
+      where: {
+        id: parseInt(patientId),
+        medecinId: medecinId
+      }
+    });
+
+    if (!existingPatient) {
+      return res.status(404).json({ message: 'Patient not found or does not belong to this doctor' });
+    }
+
+    // Delete patient (CASCADE will delete related records)
+    await prisma.patient.delete({
+      where: {
+        id: parseInt(patientId)
+      }
+    });
+
+    res.status(200).json({ 
+      message: 'Patient deleted successfully',
+      patientId: parseInt(patientId)
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete patient', error: err.message });
     console.error(err);
   }
 }

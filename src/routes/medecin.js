@@ -1,5 +1,27 @@
 import express from 'express';
-import { newPatient, listPatients, newRendezVous, test, listTodayAppointments, getPatientProfile, addToWaitingListToday, getCompletedAppointments, getCompletedAppointmentsGrouped, finishConsultation, cancelledApointment, addToWaitingList, addToInProgress, getBiologicalRequests, createBiologicalRequest, updateBiologicalRequest, getAllAppointments, getStatistics, getHistory } from '../controllers/medecinController.js';
+import { 
+  newPatient, 
+  listPatients, 
+  newRendezVous, 
+  test, 
+  listTodayAppointments, 
+  getPatientProfile, 
+  updatePatient,
+  deletePatient,
+  addToWaitingListToday, 
+  getCompletedAppointments, 
+  getCompletedAppointmentsGrouped, 
+  finishConsultation, 
+  cancelledApointment, 
+  addToWaitingList, 
+  addToInProgress, 
+  getBiologicalRequests, 
+  createBiologicalRequest, 
+  updateBiologicalRequest, 
+  getAllAppointments, 
+  getStatistics, 
+  getHistory 
+} from '../controllers/medecinController.js';
 import { verifyAccessToken } from '../middleware/verifyAccessToken.js';
 import { PrismaClient } from '@prisma/client';
 
@@ -22,6 +44,10 @@ router.get('/completed-appointments-grouped', verifyAccessToken, getCompletedApp
 router.get('/history', verifyAccessToken, getHistory);
 router.get('/profile-patient/:id', verifyAccessToken, getPatientProfile)
 router.get('/test', test)
+
+// Patient management routes
+router.put('/patients/:id', verifyAccessToken, updatePatient);
+router.delete('/patients/:id', verifyAccessToken, deletePatient);
 
 // Biological request routes
 router.get('/biological-requests/:patientId', verifyAccessToken, getBiologicalRequests);

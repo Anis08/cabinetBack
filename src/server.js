@@ -34,8 +34,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use('/auth', authRoutes);
 app.use('/medecin/ads', adsRoutes);
-// DISABLED: Uncomment after running Prisma migration
-// app.use('/medecin/complementary-exams', complementaryExamsRoutes);
+app.use('/medecin/complementary-exams', complementaryExamsRoutes);
 app.use('/medecin', medecinRoutes);
 app.use('/admin', adminRoutes);
 app.use('/public', publicRoutes);

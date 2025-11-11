@@ -980,8 +980,8 @@ export const getPatientProfile = async (req, res) => {
         id: true,
         fullName: true,
         phoneNumber: true,
-        email: true,
-        address: true,
+        // email: true,        // DISABLED: Uncomment after database migration
+        // address: true,      // DISABLED: Uncomment after database migration
         gender: true,
         poids: true,
         taille: true,
@@ -1044,7 +1044,7 @@ export const getPatientProfile = async (req, res) => {
 export const updatePatient = async (req, res) => {
   const medecinId = req.medecinId;
   const patientId = req.params.id;
-  const { fullName, dateOfBirth, gender, phoneNumber, email, address, maladieChronique } = req.body;
+  const { fullName, dateOfBirth, gender, phoneNumber, /* email, address, */ maladieChronique } = req.body;
 
   try {
     // Verify that patient belongs to this medecin
@@ -1074,16 +1074,16 @@ export const updatePatient = async (req, res) => {
         dateOfBirth: new Date(dateOfBirth),
         gender,
         phoneNumber: phoneNumber || existingPatient.phoneNumber,
-        email: email || null,
-        address: address || null,
+        // email: email || null,           // DISABLED: Uncomment after database migration
+        // address: address || null,       // DISABLED: Uncomment after database migration
         maladieChronique: maladieChronique || existingPatient.maladieChronique
       },
       select: {
         id: true,
         fullName: true,
         phoneNumber: true,
-        email: true,
-        address: true,
+        // email: true,              // DISABLED: Uncomment after database migration
+        // address: true,            // DISABLED: Uncomment after database migration
         gender: true,
         dateOfBirth: true,
         maladieChronique: true,

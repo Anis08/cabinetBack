@@ -980,8 +980,8 @@ export const getPatientProfile = async (req, res) => {
         id: true,
         fullName: true,
         phoneNumber: true,
-        email: true,
-        address: true,
+        // email: true,  // TEMPORARY: Commented until migration is run
+        // address: true,  // TEMPORARY: Commented until migration is run
         gender: true,
         poids: true,
         taille: true,
@@ -1082,8 +1082,8 @@ export const updatePatient = async (req, res) => {
         id: true,
         fullName: true,
         phoneNumber: true,
-        email: true,
-        address: true,
+        // email: true,  // TEMPORARY: Commented until migration is run
+        // address: true,  // TEMPORARY: Commented until migration is run
         gender: true,
         dateOfBirth: true,
         maladieChronique: true,

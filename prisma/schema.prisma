@@ -18,11 +18,15 @@ model Medecin {
   fullName            String               @unique
   speciality          String
   bio                 String?
+  price               Int?                 // Prix de consultation
   createdAt           DateTime             @default(now())
   patients            Patient[]
   rendezVous          RendezVous[]
   biologicalRequests  BiologicalRequest[]
   advertisements      Advertisement[]
+  medicaments         Medicament[]
+  ordonnances         Ordonnance[]         @relation("MedecinOrdonnances")
+  demandeMedicaments  DemandeMedicament[]
 }
 
 enum Gender {
@@ -48,6 +52,7 @@ model Patient {
   rendezVous          RendezVous[]
   biologicalRequests  BiologicalRequest[]
   complementaryExams  ComplementaryExam[]
+  ordonnances         Ordonnance[]
 }
 
 enum RendezVousState {
@@ -77,8 +82,9 @@ model RendezVous {
   paSystolique  Int?
   paDiastolique Int?
 
-  patient Patient @relation(fields: [patientId], references: [id])
-  medecin Medecin @relation(fields: [medecinId], references: [id])
+  patient     Patient       @relation(fields: [patientId], references: [id])
+  medecin     Medecin       @relation(fields: [medecinId], references: [id])
+  ordonnances Ordonnance[]
 
   @@unique([patientId, medecinId, date])
 }
@@ -157,3 +163,95 @@ model ExamFile {
   exam      ComplementaryExam @relation(fields: [examId], references: [id], onDelete: Cascade)
 }
 
+// Médicaments
+model Medicament {
+  id              Int                   @id @default(autoincrement())
+  nom             String
+  dosage          String
+  forme           String                // Comprimé, Gélule, Sirop, etc.
+  fabricant       String
+  moleculeMere    String
+  type            String                // Antalgique, Antibiotique, etc.
+  frequence       String?               // Fréquence recommandée
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  medecinId       Int?                  // Null si médicament global, sinon créé par un médecin
+  medecin         Medecin?              @relation(fields: [medecinId], references: [id], onDelete: SetNull)
+  
+  // Relations
+  ordonnanceMedicaments OrdonnanceMedicament[]
+  
+  @@unique([nom, dosage, forme]) // Un médicament unique par combinaison nom+dosage+forme
+  @@index([nom])
+  @@index([moleculeMere])
+  @@index([type])
+}
+
+// Ordonnances
+model Ordonnance {
+  id                Int                   @id @default(autoincrement())
+  patientId         Int
+  medecinId         Int
+  rendezVousId      Int?                  // Optionnel: lié à un RDV
+  dateCreation      DateTime              @default(now())
+  dateValidite      DateTime?             // Date d'expiration de l'ordonnance
+  note              String?               @db.Text
+  
+  // Relations
+  patient           Patient               @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  medecin           Medecin               @relation("MedecinOrdonnances", fields: [medecinId], references: [id])
+  rendezVous        RendezVous?           @relation(fields: [rendezVousId], references: [id], onDelete: SetNull)
+  medicaments       OrdonnanceMedicament[]
+  
+  @@index([patientId])
+  @@index([medecinId])
+  @@index([dateCreation])
+}
+
+// Table de liaison entre Ordonnance et Medicament (Many-to-Many avec données supplémentaires)
+model OrdonnanceMedicament {
+  id              Int         @id @default(autoincrement())
+  ordonnanceId    Int
+  medicamentId    Int
+  posologie       String      // "1 comprimé 3 fois par jour"
+  duree           String?     // "7 jours", "1 mois"
+  instructions    String?     @db.Text // Instructions spécifiques
+  
+  ordonnance      Ordonnance  @relation(fields: [ordonnanceId], references: [id], onDelete: Cascade)
+  medicament      Medicament  @relation(fields: [medicamentId], references: [id])
+  
+  @@unique([ordonnanceId, medicamentId])
+}
+
+// Demandes d'ajout de médicament
+enum DemandeMedicamentStatus {
+  EnAttente
+  Acceptee
+  Rejetee
+}
+
+model DemandeMedicament {
+  id              Int                     @id @default(autoincrement())
+  nom             String
+  dosage          String
+  forme           String
+  fabricant       String
+  moleculeMere    String
+  type            String
+  frequence       String?
+  medecinId       Int                     // Médecin qui a fait la demande
+  status          DemandeMedicamentStatus @default(EnAttente)
+  motifRejet      String?                 // Si rejeté, raison du rejet
+  medicamentId    Int?                    // Si accepté, ID du médicament créé
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  traitePar       Int?                    // ID de l'admin/medecin qui a traité
+  dateTraitement  DateTime?               // Date de traitement de la demande
+  
+  medecin         Medecin                 @relation(fields: [medecinId], references: [id], onDelete: Cascade)
+  medicament      Medicament?             @relation(fields: [medicamentId], references: [id], onDelete: SetNull)
+  
+  @@index([medecinId])
+  @@index([status])
+  @@index([createdAt])
+}

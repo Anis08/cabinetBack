@@ -9,6 +9,10 @@ import adminRoutes from './routes/admin.js';
 import publicRoutes from './routes/public.js';
 import adsRoutes from './routes/ads.js';
 import complementaryExamsRoutes from './routes/complementaryExams.js';
+import whatsappNotificationsRoutes from './routes/whatsappNotifications.js';
+import medicamentsRoutes from './routes/medicaments.js';
+import ordonnancesRoutes from './routes/ordonnances.js';
+import demandesMedicamentsRoutes from './routes/demandeMedicaments.js';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { initializeWebSocket } from './services/websocketService.js';
@@ -33,11 +37,15 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use('/auth', authRoutes);
+app.use('/public', publicRoutes);
 app.use('/medecin/ads', adsRoutes);
 app.use('/medecin/complementary-exams', complementaryExamsRoutes);
+app.use('/medecin/whatsapp-notifications', whatsappNotificationsRoutes);
+app.use('/medecin/medicaments', medicamentsRoutes);
+app.use('/medecin/ordonnances', ordonnancesRoutes);
+app.use('/medecin/demandes-medicaments', demandesMedicamentsRoutes);
 app.use('/medecin', medecinRoutes);
 app.use('/admin', adminRoutes);
-app.use('/public', publicRoutes);
 
 app.get('/', (req, res) => {
   res.status(200).send('API is running');

@@ -16,6 +16,7 @@ import demandesMedicamentsRoutes from './routes/demandeMedicaments.js';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { initializeWebSocket } from './services/websocketService.js';
+import { startReminderScheduler } from './services/whatsappNotificationService.js';
 
 // Get __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -53,6 +54,9 @@ app.get('/', (req, res) => {
 
 // Initialize WebSocket server
 initializeWebSocket(httpServer);
+
+// Initialize WhatsApp reminder scheduler
+startReminderScheduler();
 
 const PORT = process.env.PORT || 4000;
 httpServer.listen(PORT, () => {

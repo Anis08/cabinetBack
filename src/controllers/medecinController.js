@@ -1044,7 +1044,8 @@ export const getPatientProfile = async (req, res) => {
 export const updatePatient = async (req, res) => {
   const medecinId = req.medecinId;
   const patientId = req.params.id;
-  const { fullName, dateOfBirth, gender, phoneNumber, email, address, maladieChronique } = req.body;
+  // TEMPORARY: email and address removed until migration is run
+  const { fullName, dateOfBirth, gender, phoneNumber, /* email, address, */ maladieChronique } = req.body;
 
   try {
     // Verify that patient belongs to this medecin
@@ -1074,8 +1075,9 @@ export const updatePatient = async (req, res) => {
         dateOfBirth: new Date(dateOfBirth),
         gender,
         phoneNumber: phoneNumber || existingPatient.phoneNumber,
-        email: email || null,
-        address: address || null,
+        // TEMPORARY: email and address commented until migration is run
+        // email: email || null,
+        // address: address || null,
         maladieChronique: maladieChronique || existingPatient.maladieChronique
       },
       select: {

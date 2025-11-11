@@ -6,6 +6,7 @@ import {
   deleteFromGoogleDrive, 
   extractFileIdFromUrl 
 } from '../services/googleDriveService.js';
+import { google } from 'googleapis';
 
 const prisma = new PrismaClient();
 
@@ -303,9 +304,10 @@ export const uploadAdFile = async (req, res) => {
       req.file.mimetype
     );
 
+    const id = new URL(uploadResult.url).searchParams.get('id');
     res.status(200).json({
       message: 'File uploaded successfully to Google Drive',
-      url: uploadResult.url,
+      url: id, //store the id of the url to build it in the front end
       fileId: uploadResult.fileId,
       directLink: uploadResult.directLink,
       webViewLink: uploadResult.webViewLink,
@@ -367,5 +369,47 @@ export const getActiveAds = async (req, res) => {
       message: 'Failed to fetch active advertisements',
       error: error.message
     });
+  }
+};
+
+/**
+ * Proxy an image from Google Drive to the frontend
+ * Usage: GET /ads/image/:fileId
+ */
+export const sendAdImage = async (req, res) => {
+  const fileId = req.params.fileId;
+  if (!fileId) {
+    return res.status(400).json({ message: 'Missing fileId parameter' });
+  }
+
+  try {
+    // Initialize OAuth2 client as in your googleDriveService.js
+    const oAuth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
+    oAuth2Client.setCredentials({
+      refresh_token: process.env.GOOGLE_REFRESH_TOKEN
+    });
+    const drive = google.drive({ version: 'v3', auth: oAuth2Client });
+
+    // Get file metadata to set the correct Content-Type
+    const metadata = await drive.files.get({
+      fileId,
+      fields: 'name, mimeType'
+    });
+
+    res.setHeader('Content-Type', metadata.data.mimeType);
+
+    // Stream the file content
+    const driveRes = await drive.files.get(
+      { fileId, alt: 'media' },
+      { responseType: 'stream' }
+    );
+    driveRes.data.pipe(res);
+  } catch (error) {
+    console.error('Error sending image:', error);
+    res.status(500).json({ message: 'Failed to fetch image', error: error.message });
   }
 };

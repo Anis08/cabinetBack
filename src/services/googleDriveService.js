@@ -1,60 +1,25 @@
-import { google } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
+import { google } from 'googleapis';
 import { Readable } from 'stream';
 
 /**
- * Initialize Google Drive API with OAuth credentials
+ * Initialize Google Drive API with Service Account credentials
  */
 const initializeDrive = () => {
-  try {
-    // Use OAuth2 client with refresh token
-    if (process.env.GOOGLE_CLIENT_ID && 
-        process.env.GOOGLE_CLIENT_SECRET && 
-        process.env.GOOGLE_REFRESH_TOKEN) {
-      
-      const oauth2Client = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
-        'http://localhost' // Redirect URL (not used for refresh token flow)
-      );
-
-      oauth2Client.setCredentials({
-        refresh_token: process.env.GOOGLE_REFRESH_TOKEN
-      });
-
-      return google.drive({ version: 'v3', auth: oauth2Client });
-    }
-
-    // Fallback: Service account with domain-wide delegation (requires Workspace)
-    if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY && process.env.GOOGLE_USER_EMAIL) {
-      const serviceAccountKey = JSON.parse(
-        Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString()
-      );
-
-      const auth = new google.auth.JWT({
-        email: serviceAccountKey.client_email,
-        key: serviceAccountKey.private_key,
-        scopes: ['https://www.googleapis.com/auth/drive.file'],
-        subject: process.env.GOOGLE_USER_EMAIL // Impersonate this user
-      });
-
-      return google.drive({ version: 'v3', auth });
-    }
-
-    throw new Error('Google Drive credentials not configured. Please set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN');
-  } catch (error) {
-    console.error('Error initializing Google Drive:', error);
-    throw error;
-  }
+  const oAuth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  );
+  oAuth2Client.setCredentials({
+    refresh_token: process.env.GOOGLE_REFRESH_TOKEN
+  });
+  return google.drive({ version: 'v3', auth: oAuth2Client });
 };
 
 /**
  * Upload file to Google Drive
- * @param {Buffer} fileBuffer - File buffer
- * @param {string} fileName - Original file name
- * @param {string} mimeType - File MIME type
- * @returns {Promise<{fileId: string, webViewLink: string, webContentLink: string}>}
  */
 export const uploadToGoogleDrive = async (fileBuffer, fileName, mimeType) => {
   try {
@@ -81,11 +46,10 @@ export const uploadToGoogleDrive = async (fileBuffer, fileName, mimeType) => {
 
     // Upload file
     const response = await drive.files.create({
-  requestBody: fileMetadata,
-  media: media,
-  fields: 'id, name, mimeType, webViewLink, webContentLink',
-  supportsAllDrives: true 
-});
+      requestBody: fileMetadata,
+      media: media,
+      fields: 'id, name, mimeType, webViewLink, webContentLink'
+    });
 
     // Make file publicly accessible
     await drive.permissions.create({
@@ -108,10 +72,8 @@ export const uploadToGoogleDrive = async (fileBuffer, fileName, mimeType) => {
     return {
       fileId: response.data.id,
       fileName: fileName,
-      webViewLink: file.data.webViewLink,
-      webContentLink: file.data.webContentLink,
-      directLink: directLink,
-      url: directLink // Primary URL for display
+      url: directLink, // Store only the direct link
+      // Optionally, you can still return webViewLink/webContentLink if needed
     };
 
   } catch (error) {
@@ -122,8 +84,6 @@ export const uploadToGoogleDrive = async (fileBuffer, fileName, mimeType) => {
 
 /**
  * Delete file from Google Drive
- * @param {string} fileId - Google Drive file ID
- * @returns {Promise<boolean>}
  */
 export const deleteFromGoogleDrive = async (fileId) => {
   try {
@@ -137,54 +97,43 @@ export const deleteFromGoogleDrive = async (fileId) => {
 
   } catch (error) {
     console.error('Error deleting from Google Drive:', error);
-    // Don't throw error, just log it (file might already be deleted)
     return false;
   }
 };
 
 /**
  * Get or create the "MedicalAds" folder in Google Drive
- * @param {object} drive - Google Drive API instance
- * @returns {Promise<string>} Folder ID
  */
 const getOrCreateAdsFolder = async (drive) => {
   const folderName = 'MedicalAds';
 
-  try {
-    // Check if folder exists
-    const response = await drive.files.list({
-      q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-      fields: 'files(id, name)',
-      spaces: 'drive'
-    });
+  // Search for the folder in My Drive
+  const response = await drive.files.list({
+    q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    fields: 'files(id, name)',
+    spaces: 'drive'
+  });
 
-    if (response.data.files.length > 0) {
-      return response.data.files[0].id;
-    }
-
-    // Create folder if it doesn't exist
-    const folderMetadata = {
-      name: folderName,
-      mimeType: 'application/vnd.google-apps.folder'
-    };
-
-    const folder = await drive.files.create({
-      requestBody: folderMetadata,
-      fields: 'id'
-    });
-
-    return folder.data.id;
-
-  } catch (error) {
-    console.error('Error creating/getting ads folder:', error);
-    throw error;
+  if (response.data.files.length > 0) {
+    return response.data.files[0].id;
   }
+
+  // Create folder if it doesn't exist
+  const folderMetadata = {
+    name: folderName,
+    mimeType: 'application/vnd.google-apps.folder'
+  };
+
+  const folder = await drive.files.create({
+    requestBody: folderMetadata,
+    fields: 'id'
+  });
+
+  return folder.data.id;
 };
 
 /**
  * Extract Google Drive file ID from URL
- * @param {string} url - Google Drive URL
- * @returns {string|null} File ID or null
  */
 export const extractFileIdFromUrl = (url) => {
   if (!url) return null;
@@ -209,8 +158,6 @@ export const extractFileIdFromUrl = (url) => {
 
 /**
  * Get file info from Google Drive
- * @param {string} fileId - Google Drive file ID
- * @returns {Promise<object>} File metadata
  */
 export const getFileInfo = async (fileId) => {
   try {

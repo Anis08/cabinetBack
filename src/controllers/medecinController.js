@@ -1618,7 +1618,6 @@ export const getDashboardKPIs = async (req, res) => {
           id: true,
           state: true,
           paid: true,
-          createdAt: true
         }
       }),
       prisma.rendezVous.findMany({
@@ -1646,29 +1645,10 @@ export const getDashboardKPIs = async (req, res) => {
     const completed = todayAppointments.filter(apt => apt.state === 'Completed').length;
     const completedYesterday = yesterdayAppointments.filter(apt => apt.state === 'Completed').length;
 
-    // Get medecin's price
-    const medecin = await prisma.medecin.findUnique({
-      where: { id: medecinId },
-      select: { price: true }
-    });
-
-    const pricePerConsultation = medecin?.price || 50;
     
-    // Calculate revenue (only paid appointments)
-    const revenue = todayAppointments
-      .filter(apt => apt.state === 'Completed' && apt.paid)
-      .length * pricePerConsultation;
+ 
 
-    const revenueYesterday = yesterdayAppointments
-      .filter(apt => apt.state === 'Completed' && apt.paid)
-      .length * pricePerConsultation;
 
-    // Calculate trends
-    const patientsDiff = patientsToday - patientsYesterday;
-    const completedDiff = completed - completedYesterday;
-    const revenuePercentChange = revenueYesterday > 0 
-      ? Math.round(((revenue - revenueYesterday) / revenueYesterday) * 100)
-      : 0;
 
     // Calculate average waiting time (from today's completed appointments)
     const completedToday = todayAppointments.filter(apt => apt.state === 'Completed');
@@ -1683,7 +1663,7 @@ export const getDashboardKPIs = async (req, res) => {
     }
 
     // Calculate completion percentage
-    const completionPercentage = patientsToday > 0 
+    const completionPercentage = patientsToday > 0
       ? Math.round((completed / patientsToday) * 100)
       : 0;
 
@@ -1691,12 +1671,9 @@ export const getDashboardKPIs = async (req, res) => {
       patientsToday,
       waiting: waiting + inProgress,
       completed,
-      revenue,
       trends: {
-        patientsDiff: patientsDiff >= 0 ? `+${patientsDiff}` : `${patientsDiff}`,
         waitingTime: avgWaitingTime > 0 ? `${avgWaitingTime}min` : 'N/A',
         completionRate: `${completionPercentage}%`,
-        revenueChange: revenuePercentChange >= 0 ? `+${revenuePercentChange}%` : `${revenuePercentChange}%`
       }
     };
 

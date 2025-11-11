@@ -980,8 +980,8 @@ export const getPatientProfile = async (req, res) => {
         id: true,
         fullName: true,
         phoneNumber: true,
-        // email: true,  // TEMPORARY: Commented until migration is run
-        // address: true,  // TEMPORARY: Commented until migration is run
+        email: true,
+        address: true,
         gender: true,
         poids: true,
         taille: true,
@@ -1044,8 +1044,7 @@ export const getPatientProfile = async (req, res) => {
 export const updatePatient = async (req, res) => {
   const medecinId = req.medecinId;
   const patientId = req.params.id;
-  // TEMPORARY: email and address removed until migration is run
-  const { fullName, dateOfBirth, gender, phoneNumber, /* email, address, */ maladieChronique } = req.body;
+  const { fullName, dateOfBirth, gender, phoneNumber, email, address, maladieChronique } = req.body;
 
   try {
     // Verify that patient belongs to this medecin
@@ -1075,17 +1074,16 @@ export const updatePatient = async (req, res) => {
         dateOfBirth: new Date(dateOfBirth),
         gender,
         phoneNumber: phoneNumber || existingPatient.phoneNumber,
-        // TEMPORARY: email and address commented until migration is run
-        // email: email || null,
-        // address: address || null,
+        email: email || null,
+        address: address || null,
         maladieChronique: maladieChronique || existingPatient.maladieChronique
       },
       select: {
         id: true,
         fullName: true,
         phoneNumber: true,
-        // email: true,  // TEMPORARY: Commented until migration is run
-        // address: true,  // TEMPORARY: Commented until migration is run
+        email: true,
+        address: true,
         gender: true,
         dateOfBirth: true,
         maladieChronique: true,

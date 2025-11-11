@@ -1590,3 +1590,119 @@ export const getStatistics = async (req, res) => {
     console.error(err);
   }
 };
+
+// Get Dashboard KPIs
+export const getDashboardKPIs = async (req, res) => {
+  const medecinId = req.medecinId;
+  
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Get today's appointments
+    const [todayAppointments, yesterdayAppointments] = await Promise.all([
+      prisma.rendezVous.findMany({
+        where: {
+          medecinId,
+          date: {
+            gte: today,
+            lt: tomorrow
+          }
+        },
+        select: {
+          id: true,
+          state: true,
+          paid: true,
+          createdAt: true
+        }
+      }),
+      prisma.rendezVous.findMany({
+        where: {
+          medecinId,
+          date: {
+            gte: yesterday,
+            lt: today
+          }
+        },
+        select: {
+          id: true,
+          state: true,
+          paid: true
+        }
+      })
+    ]);
+
+    // Calculate KPIs
+    const patientsToday = todayAppointments.length;
+    const patientsYesterday = yesterdayAppointments.length;
+    
+    const waiting = todayAppointments.filter(apt => apt.state === 'Waiting').length;
+    const inProgress = todayAppointments.filter(apt => apt.state === 'InProgress').length;
+    const completed = todayAppointments.filter(apt => apt.state === 'Completed').length;
+    const completedYesterday = yesterdayAppointments.filter(apt => apt.state === 'Completed').length;
+
+    // Get medecin's price
+    const medecin = await prisma.medecin.findUnique({
+      where: { id: medecinId },
+      select: { price: true }
+    });
+
+    const pricePerConsultation = medecin?.price || 50;
+    
+    // Calculate revenue (only paid appointments)
+    const revenue = todayAppointments
+      .filter(apt => apt.state === 'Completed' && apt.paid)
+      .length * pricePerConsultation;
+
+    const revenueYesterday = yesterdayAppointments
+      .filter(apt => apt.state === 'Completed' && apt.paid)
+      .length * pricePerConsultation;
+
+    // Calculate trends
+    const patientsDiff = patientsToday - patientsYesterday;
+    const completedDiff = completed - completedYesterday;
+    const revenuePercentChange = revenueYesterday > 0 
+      ? Math.round(((revenue - revenueYesterday) / revenueYesterday) * 100)
+      : 0;
+
+    // Calculate average waiting time (from today's completed appointments)
+    const completedToday = todayAppointments.filter(apt => apt.state === 'Completed');
+    let avgWaitingTime = 0;
+    if (completedToday.length > 0) {
+      const waitTimes = completedToday.map(apt => {
+        const created = new Date(apt.createdAt);
+        const now = new Date();
+        return Math.round((now - created) / (1000 * 60)); // minutes
+      });
+      avgWaitingTime = Math.round(waitTimes.reduce((a, b) => a + b, 0) / waitTimes.length);
+    }
+
+    // Calculate completion percentage
+    const completionPercentage = patientsToday > 0 
+      ? Math.round((completed / patientsToday) * 100)
+      : 0;
+
+    const kpis = {
+      patientsToday,
+      waiting: waiting + inProgress,
+      completed,
+      revenue,
+      trends: {
+        patientsDiff: patientsDiff >= 0 ? `+${patientsDiff}` : `${patientsDiff}`,
+        waitingTime: avgWaitingTime > 0 ? `${avgWaitingTime}min` : 'N/A',
+        completionRate: `${completionPercentage}%`,
+        revenueChange: revenuePercentChange >= 0 ? `+${revenuePercentChange}%` : `${revenuePercentChange}%`
+      }
+    };
+
+    res.status(200).json({ kpis });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to retrieve dashboard KPIs', error: err.message });
+    console.error(err);
+  }
+};

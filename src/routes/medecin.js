@@ -20,7 +20,8 @@ import {
   updateBiologicalRequest, 
   getAllAppointments, 
   getStatistics, 
-  getHistory 
+  getHistory,
+  getDashboardKPIs
 } from '../controllers/medecinController.js';
 import { verifyAccessToken } from '../middleware/verifyAccessToken.js';
 import { PrismaClient } from '@prisma/client';
@@ -37,6 +38,7 @@ router.post('/add-to-waiting-today', verifyAccessToken, addToWaitingListToday);
 router.get('/list-patients', verifyAccessToken, listPatients);
 router.get('/appointments', verifyAccessToken, getAllAppointments);
 router.get('/statistics', verifyAccessToken, getStatistics);
+router.get('/dashboard-kpis', verifyAccessToken, getDashboardKPIs);
 router.get('/today-appointments', verifyAccessToken, listTodayAppointments);
 router.get('/cancel-appointments', cancelledApointment)
 router.get('/completed-appointments', verifyAccessToken, getCompletedAppointments);

@@ -1005,8 +1005,7 @@ export const getPatientProfile = async (req, res) => {
             imc: true,
             pulse: true,
             paSystolique: true,
-            paDiastolique: true,
-            status: true
+            paDiastolique: true
           },
           orderBy: {
             date: 'desc'

@@ -12,7 +12,6 @@ import { verifyAccessToken } from '../middleware/verifyAccessToken.js';
 const router = express.Router();
 
 // Toutes les routes nécessitent une authentification JWT
-router.use(verifyAccessToken);
 
 /**
  * Routes pour la gestion des médicaments

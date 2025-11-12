@@ -44,13 +44,8 @@ export const getAllMedicaments = async (req, res) => {
         nom: 'asc'
       },
       include: {
-        medecin: {
-          select: {
-            id: true,
-            fullName: true,
-            speciality: true
-          }
-        },
+        dosages: true,
+        moleculeMereRel: true,
         ordonnanceMedicaments: {
           select: {
             id: true,
@@ -77,7 +72,6 @@ export const getAllMedicaments = async (req, res) => {
     const stats = {
       total: medicaments.length,
       types: [...new Set(medicaments.map(m => m.type))].length,
-      fabricants: [...new Set(medicaments.map(m => m.fabricant))].length
     };
     
     res.status(200).json({
@@ -112,7 +106,7 @@ export const searchMedicaments = async (req, res) => {
       where: {
         OR: [
           { nom: { contains: q, mode: 'insensitive' } },
-          { moleculeMere: { contains: q, mode: 'insensitive' } }
+          { moleculeMereRel: { nom: { contains: q, mode: 'insensitive' } } },
         ]
       },
       take: 20, // Limiter à 20 résultats
@@ -120,17 +114,10 @@ export const searchMedicaments = async (req, res) => {
         nom: 'asc'
       },
       include: {
-        medecin: {
-          select: {
-            id: true,
-            fullName: true
-          }
-        },
-        _count: {
-          select: {
-            ordonnanceMedicaments: true
-          }
-        }
+        dosages: true,
+        moleculeMereRel: true,
+        
+        
       }
     });
     

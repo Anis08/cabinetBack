@@ -286,6 +286,8 @@ export const createOrdonnance = async (req, res) => {
   
   try {
     const { patientId, rendezVousId, dateValidite, note, medicaments } = req.body;
+
+    console.log(req.body)
     
     // Validation
     if (!patientId || !medicaments || !Array.isArray(medicaments) || medicaments.length === 0) {
@@ -330,8 +332,7 @@ export const createOrdonnance = async (req, res) => {
     const demandesCreated = [];
     
     for (const med of medicaments) {
-      // Support multiple field names for flexibility
-      const posologie = med.posologie || med.frequence;
+      const posologie = med.posologie;
       const medicamentId = med.medicamentId || med.id;
       
       if (!posologie) {
@@ -448,10 +449,9 @@ export const createOrdonnance = async (req, res) => {
               select: {
                 id: true,
                 nom: true,
-                dosage: true,
-                forme: true,
-                moleculeMere: true,
-                type: true
+                type: true,
+                dosages: true,
+                moleculeMereRel:true,
               }
             }
           }

@@ -24,8 +24,7 @@ model Medecin {
   rendezVous          RendezVous[]
   biologicalRequests  BiologicalRequest[]
   advertisements      Advertisement[]
-  medicaments         Medicament[]
-  ordonnances         Ordonnance[]         @relation("MedecinOrdonnances")
+  ordonnances         Ordonnance[]         
   demandeMedicaments  DemandeMedicament[]
 }
 
@@ -167,16 +166,10 @@ model ExamFile {
 model Medicament {
   id              Int                   @id @default(autoincrement())
   nom             String                @unique
-  dosage          String?
-  forme           String?                // Comprimé, Gélule, Sirop, etc.
-  fabricant       String?
   moleculeMereId    Int
   type            String                // Antalgique, Antibiotique, etc.
-  frequence       String?               // Fréquence recommandée
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
-  medecinId       Int?                  // Null si médicament global, sinon créé par un médecin
-  medecin         Medecin?              @relation(fields: [medecinId], references: [id], onDelete: SetNull)
   dosages        Dosage[]
   moleculeMereRel  moleculeMere         @relation(fields: [moleculeMereId], references: [id], onDelete: Cascade)
 
@@ -215,7 +208,7 @@ model Ordonnance {
   
   // Relations
   patient           Patient               @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  medecin           Medecin               @relation("MedecinOrdonnances", fields: [medecinId], references: [id])
+  medecin           Medecin               @relation(fields: [medecinId], references: [id])
   rendezVous        RendezVous?           @relation(fields: [rendezVousId], references: [id], onDelete: SetNull)
   medicaments       OrdonnanceMedicament[]
   

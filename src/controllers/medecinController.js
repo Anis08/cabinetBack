@@ -492,6 +492,91 @@ export const finishConsultation = async (req, res) => {
   }
 }
 
+// Supprimer un patient de la file d'attente en le marquant comme ayant terminé sa consultation
+export const removeFromWaitingQueue = async (req, res) => {
+  const medecinId = req.medecinId;
+  const { rendezVousId } = req.body;
+
+  try {
+    if (!rendezVousId) {
+      return res.status(400).json({ message: 'Le rendez-vous ID est requis' });
+    }
+
+    // Vérifier que le rendez-vous existe et appartient au médecin
+    const rendezVous = await prisma.rendezVous.findFirst({
+      where: {
+        id: rendezVousId,
+        medecinId: medecinId
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        }
+      }
+    });
+
+    if (!rendezVous) {
+      return res.status(404).json({ 
+        message: 'Rendez-vous non trouvé ou n\'appartient pas à ce médecin' 
+      });
+    }
+
+    // Vérifier que le rendez-vous est bien dans la file d'attente (Waiting)
+    if (rendezVous.state !== 'Waiting') {
+      return res.status(400).json({ 
+        message: `Le rendez-vous doit être en attente pour être supprimé de la file. État actuel: ${rendezVous.state}` 
+      });
+    }
+
+    // Marquer le rendez-vous comme terminé sans les détails de consultation
+    const completed = await prisma.rendezVous.update({
+      where: {
+        id: rendezVousId,
+      },
+      data: {
+        state: 'Completed',
+        endTime: new Date(),
+        // On ne met pas startTime si elle n'existe pas déjà
+        startTime: rendezVous.startTime || new Date(),
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            fullName: true,
+            phoneNumber: true
+          }
+        }
+      }
+    });
+
+    // Trigger WebSocket update pour mettre à jour la file d'attente publique
+    triggerWaitingLineUpdate();
+
+    res.status(200).json({ 
+      message: 'Patient retiré de la file d\'attente et marqué comme consultation terminée',
+      rendezVous: {
+        id: completed.id,
+        patientName: completed.patient.fullName,
+        state: completed.state,
+        arrivalTime: completed.arrivalTime,
+        startTime: completed.startTime,
+        endTime: completed.endTime
+      }
+    });
+
+  } catch (err) {
+    console.error('Error removing from waiting queue:', err);
+    res.status(500).json({ 
+      message: 'Erreur lors de la suppression de la file d\'attente', 
+      error: err.message 
+    });
+  }
+};
+
 
 
 export const getCompletedAppointments = async (req, res) => {

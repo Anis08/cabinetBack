@@ -275,6 +275,54 @@ export const addToWaitingList = async (req, res) => {
   }
 }
 
+export const returnToQueue = async (req, res) => {
+  const medecinId = req.medecinId
+  const { rendezVousId } = req.body;
+  try {
+    if (!rendezVousId) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+
+
+    const rendezVous = await prisma.rendezVous.findUnique({
+      where: {
+        id: rendezVousId,
+
+      }
+    })
+
+
+    if (!rendezVous || rendezVous.state !== 'InProgress') {
+      return res.status(404).json({ message: 'Rendez-vous not found' });
+
+    }
+
+
+    await prisma.rendezVous.update({
+      where: {
+        id: rendezVousId,
+      },
+      data: {
+        state: 'Waiting',
+        arrivalTime: null,
+      }
+
+    })
+
+    // Trigger WebSocket update for public waiting line
+    triggerWaitingLineUpdate();
+
+    res.status(200).json({ state: 'Waiting' });
+  } catch (err) {
+
+    if (err.code === 'P2002') {
+      return res.status(409).json({ message: 'Un rendez-vous identique existe déjà' });
+    }
+    res.status(500).json({ message: 'Failed to create an appointment', error: err.message });
+    console.error(err);
+  }
+}
 
 export const addToInProgress = async (req, res) => {
   const medecinId = req.medecinId

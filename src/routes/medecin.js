@@ -21,7 +21,8 @@ import {
   getAllAppointments, 
   getStatistics, 
   getHistory,
-  getDashboardKPIs
+  getDashboardKPIs,
+  returnToQueue
 } from '../controllers/medecinController.js';
 import { verifyAccessToken } from '../middleware/verifyAccessToken.js';
 import { PrismaClient } from '@prisma/client';
@@ -32,6 +33,7 @@ const router = express.Router();
 router.post('/create-patient', verifyAccessToken, newPatient);
 router.post('/add-appointment', verifyAccessToken, newRendezVous);
 router.post('/add-to-waiting', verifyAccessToken, addToWaitingList);
+router.post('/return-queue', verifyAccessToken, returnToQueue);
 router.post('/add-to-actif', verifyAccessToken, addToInProgress);
 router.post('/finish-consultation', verifyAccessToken, finishConsultation);
 router.post('/add-to-waiting-today', verifyAccessToken, addToWaitingListToday);

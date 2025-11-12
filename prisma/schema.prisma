@@ -166,26 +166,41 @@ model ExamFile {
 // Médicaments
 model Medicament {
   id              Int                   @id @default(autoincrement())
-  nom             String
-  dosage          String
-  forme           String                // Comprimé, Gélule, Sirop, etc.
-  fabricant       String
-  moleculeMere    String
+  nom             String                @unique
+  dosage          String?
+  forme           String?                // Comprimé, Gélule, Sirop, etc.
+  fabricant       String?
+  moleculeMereId    Int
   type            String                // Antalgique, Antibiotique, etc.
   frequence       String?               // Fréquence recommandée
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
   medecinId       Int?                  // Null si médicament global, sinon créé par un médecin
   medecin         Medecin?              @relation(fields: [medecinId], references: [id], onDelete: SetNull)
-  
+  dosages        Dosage[]
+  moleculeMereRel  moleculeMere         @relation(fields: [moleculeMereId], references: [id], onDelete: Cascade)
+
   // Relations
   ordonnanceMedicaments OrdonnanceMedicament[]
   demandeMedicaments    DemandeMedicament[]    @relation("MedicamentDemandes")
-  
-  @@unique([nom, dosage, forme]) // Un médicament unique par combinaison nom+dosage+forme
+   // Un médicament unique par combinaison nom+dosage+forme
   @@index([nom])
-  @@index([moleculeMere])
+  @@index([moleculeMereId])
   @@index([type])
+}
+
+
+model Dosage {
+  id            Int         @id @default(autoincrement())
+  valeur        String       // ex: "500 mg", "1 g/125 mg"
+  medicamentId  Int
+  Medicament    Medicament   @relation(fields: [medicamentId], references: [id])
+}
+
+model moleculeMere {
+  id          Int      @id @default(autoincrement())
+  nom         String   @unique
+  medicaments Medicament[]
 }
 
 // Ordonnances

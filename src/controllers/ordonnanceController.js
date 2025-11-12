@@ -67,9 +67,40 @@ export const getAllOrdonnances = async (req, res) => {
       }
     });
     
+    // Calculate statistics
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    const statsWhere = { medecinId };
+    if (patientId) {
+      statsWhere.patientId = parseInt(patientId);
+    }
+    
+    const [total, thisMonth, todayCount] = await Promise.all([
+      prisma.ordonnance.count({ where: statsWhere }),
+      prisma.ordonnance.count({
+        where: {
+          ...statsWhere,
+          dateCreation: { gte: startOfMonth }
+        }
+      }),
+      prisma.ordonnance.count({
+        where: {
+          ...statsWhere,
+          dateCreation: { gte: today }
+        }
+      })
+    ]);
+    
     res.status(200).json({
       ordonnances,
       count: ordonnances.length,
+      stats: {
+        total,
+        thisMonth,
+        today: todayCount
+      },
       message: 'Ordonnances récupérées avec succès'
     });
   } catch (error) {

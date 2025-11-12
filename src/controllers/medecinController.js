@@ -971,7 +971,7 @@ export const getPatientProfile = async (req, res) => {
   const patientId = req.params.id;
   try {
 
-    const [patient, nextAppointment] = await prisma.$transaction([
+    const [patient, nextAppointment, ordonnances] = await prisma.$transaction([
       prisma.patient.findUnique({
       where: {
         id: parseInt(patientId)
@@ -1005,7 +1005,8 @@ export const getPatientProfile = async (req, res) => {
             imc: true,
             pulse: true,
             paSystolique: true,
-            paDiastolique: true
+            paDiastolique: true,
+            status: true
           },
           orderBy: {
             date: 'desc'
@@ -1022,6 +1023,38 @@ export const getPatientProfile = async (req, res) => {
       orderBy:{
         date: 'asc'
       }
+    }),
+    prisma.ordonnance.findMany({
+      where: {
+        patientId: parseInt(patientId),
+        medecinId
+      },
+      orderBy: {
+        dateCreation: 'desc'
+      },
+      select: {
+        id: true,
+        dateCreation: true,
+        dateValidite: true,
+        note: true,
+        rendezVousId: true,
+        medicaments: {
+          select: {
+            medicament: {
+              select: {
+                id: true,
+                nom: true,
+                dosage: true,
+                forme: true,
+                type: true
+              }
+            },
+            posologie: true,
+            duree: true,
+            instructions: true
+          }
+        }
+      }
     })
   ])
 
@@ -1032,7 +1065,9 @@ export const getPatientProfile = async (req, res) => {
  
 
     res.status(200).json({
-      patient, nextAppointment
+      patient, 
+      nextAppointment,
+      ordonnances
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to list patients', error: err.message });

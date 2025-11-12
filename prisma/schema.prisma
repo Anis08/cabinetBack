@@ -180,6 +180,7 @@ model Medicament {
   
   // Relations
   ordonnanceMedicaments OrdonnanceMedicament[]
+  demandeMedicaments    DemandeMedicament[]    @relation("MedicamentDemandes")
   
   @@unique([nom, dosage, forme]) // Un médicament unique par combinaison nom+dosage+forme
   @@index([nom])
@@ -249,7 +250,7 @@ model DemandeMedicament {
   dateTraitement  DateTime?               // Date de traitement de la demande
   
   medecin         Medecin                 @relation(fields: [medecinId], references: [id], onDelete: Cascade)
-  medicament      Medicament?             @relation(fields: [medicamentId], references: [id], onDelete: SetNull)
+  medicament      Medicament?             @relation("MedicamentDemandes", fields: [medicamentId], references: [id], onDelete: SetNull)
   
   @@index([medecinId])
   @@index([status])

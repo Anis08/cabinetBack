@@ -1046,22 +1046,8 @@ export const getPatientProfile = async (req, res) => {
           dateValidite: true,
           note: true,
           rendezVousId: true,
-          medicaments: {
-            select: {
-              medicament: {
-                select: {
-                  id: true,
-                  nom: true,
-                  dosage: true,
-                  forme: true,
-                  type: true
-                }
-              },
-              posologie: true,
-              duree: true,
-              instructions: true
-            }
-          }
+          medicaments: true
+          
         }
       });
     } catch (ordError) {

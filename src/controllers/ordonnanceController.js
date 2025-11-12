@@ -330,64 +330,73 @@ export const createOrdonnance = async (req, res) => {
     const demandesCreated = [];
     
     for (const med of medicaments) {
-      if (!med.posologie) {
+      // Support multiple field names for flexibility
+      const posologie = med.posologie || med.frequence;
+      const medicamentId = med.medicamentId || med.id;
+      
+      if (!posologie) {
         return res.status(400).json({
-          message: 'La posologie est requise pour chaque médicament'
+          message: 'La posologie/fréquence est requise pour chaque médicament'
         });
       }
       
-      let medicamentId = med.medicamentId;
+      // Si le médicament a un ID, l'utiliser directement
+      if (medicamentId) {
+        medicamentsData.push({
+          medicamentId: parseInt(medicamentId),
+          posologie: posologie,
+          duree: med.duree || null,
+          instructions: med.instructions || med.momentPrise || null
+        });
+        continue;
+      }
       
-      // Si medicamentId n'est pas fourni, chercher ou créer une demande
-      if (!medicamentId && med.medicamentData) {
-        const { nom, dosage, forme, fabricant, moleculeMere, type, frequence } = med.medicamentData;
-        
-        if (!nom || !dosage || !forme || !fabricant || !moleculeMere || !type) {
-          return res.status(400).json({
-            message: 'Données du médicament incomplètes'
-          });
-        }
-        
+      // Si pas d'ID mais qu'on a les données du médicament, chercher ou créer
+      if (med.nom && med.dosage && med.forme) {
         // Vérifier si le médicament existe déjà
         const existingMed = await prisma.medicament.findFirst({
           where: {
-            nom,
-            dosage,
-            forme
+            nom: med.nom,
+            dosage: med.dosage,
+            forme: med.forme
           }
         });
         
         if (existingMed) {
-          medicamentId = existingMed.id;
-        } else {
-          // Créer une demande d'ajout
-          const demande = await prisma.demandeMedicament.create({
-            data: {
-              nom,
-              dosage,
-              forme,
-              fabricant,
-              moleculeMere,
-              type,
-              frequence: frequence || '3 fois par jour',
-              medecinId,
-              status: 'EnAttente'
-            }
+          medicamentsData.push({
+            medicamentId: existingMed.id,
+            posologie: posologie,
+            duree: med.duree || null,
+            instructions: med.instructions || med.momentPrise || null
           });
-          
-          demandesCreated.push(demande);
-          
-          // Ne pas ajouter ce médicament à l'ordonnance pour l'instant
-          continue;
+        } else {
+          // Créer une demande d'ajout si on a toutes les infos nécessaires
+          if (med.fabricant && med.moleculeMere && med.type) {
+            const demande = await prisma.demandeMedicament.create({
+              data: {
+                nom: med.nom,
+                dosage: med.dosage,
+                forme: med.forme,
+                fabricant: med.fabricant,
+                moleculeMere: med.moleculeMere,
+                type: med.type,
+                frequence: posologie,
+                medecinId,
+                status: 'EnAttente'
+              }
+            });
+            
+            demandesCreated.push(demande);
+          } else {
+            // Données incomplètes
+            return res.status(400).json({
+              message: `Données incomplètes pour le médicament: ${med.nom}. Fabricant, molécule mère et type sont requis.`
+            });
+          }
         }
-      }
-      
-      if (medicamentId) {
-        medicamentsData.push({
-          medicamentId: parseInt(medicamentId),
-          posologie: med.posologie,
-          duree: med.duree,
-          instructions: med.instructions
+      } else {
+        return res.status(400).json({
+          message: 'Chaque médicament doit avoir soit un ID, soit nom + dosage + forme'
         });
       }
     }

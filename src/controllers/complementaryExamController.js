@@ -22,7 +22,7 @@ export const getComplementaryExams = async (req, res) => {
     });
 
     if (!patient) {
-      return res.status(404).json({ message: 'Patient not found or does not belong to this doctor' });
+      return res.status(404).json({ message: 'Patient non trouvé ou n\'appartient pas à ce médecin' });
     }
 
     // Get all exams for this patient
@@ -42,12 +42,82 @@ export const getComplementaryExams = async (req, res) => {
       }
     });
 
+    // Calculate statistics
+    const stats = {
+      total: exams.length,
+      totalFiles: exams.reduce((sum, exam) => sum + exam.files.length, 0),
+      types: [...new Set(exams.map(e => e.type))],
+      recentExams: exams.filter(e => {
+        const examDate = new Date(e.date);
+        const monthAgo = new Date();
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        return examDate >= monthAgo;
+      }).length
+    };
+
     res.status(200).json({ 
-      exams: exams 
+      patient: {
+        id: patient.id,
+        fullName: patient.fullName,
+        dateOfBirth: patient.dateOfBirth,
+        gender: patient.gender
+      },
+      exams,
+      stats,
+      message: 'Examens récupérés avec succès'
     });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to get complementary exams', error: err.message });
-    console.error(err);
+    console.error('Error fetching exams:', err);
+    res.status(500).json({ 
+      message: 'Erreur lors de la récupération des examens', 
+      error: err.message 
+    });
+  }
+};
+
+// Get a single complementary exam by ID
+export const getComplementaryExamById = async (req, res) => {
+  const medecinId = req.medecinId;
+  const examId = req.params.examId;
+
+  try {
+    const exam = await prisma.complementaryExam.findFirst({
+      where: {
+        id: parseInt(examId),
+        patient: {
+          medecinId: medecinId
+        }
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            fullName: true,
+            dateOfBirth: true,
+            gender: true
+          }
+        },
+        files: {
+          orderBy: {
+            uploadDate: 'desc'
+          }
+        }
+      }
+    });
+
+    if (!exam) {
+      return res.status(404).json({ 
+        message: 'Examen non trouvé ou n\'appartient pas à votre patient' 
+      });
+    }
+
+    res.status(200).json({ exam });
+  } catch (err) {
+    console.error('Error fetching exam:', err);
+    res.status(500).json({ 
+      message: 'Erreur lors de la récupération de l\'examen', 
+      error: err.message 
+    });
   }
 };
 
@@ -59,7 +129,9 @@ export const createComplementaryExam = async (req, res) => {
   try {
     // Validate required fields
     if (!patientId || !type || !description || !date) {
-      return res.status(400).json({ message: 'Patient ID, type, description, and date are required' });
+      return res.status(400).json({ 
+        message: 'Patient ID, type, description et date sont requis' 
+      });
     }
 
     // Verify that patient belongs to this medecin
@@ -71,7 +143,9 @@ export const createComplementaryExam = async (req, res) => {
     });
 
     if (!patient) {
-      return res.status(404).json({ message: 'Patient not found or does not belong to this doctor' });
+      return res.status(404).json({ 
+        message: 'Patient non trouvé ou n\'appartient pas à ce médecin' 
+      });
     }
 
     // Create exam
@@ -83,17 +157,26 @@ export const createComplementaryExam = async (req, res) => {
         date: new Date(date)
       },
       include: {
+        patient: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        },
         files: true
       }
     });
 
     res.status(201).json({ 
-      message: 'Complementary exam created successfully',
+      message: 'Examen complémentaire créé avec succès',
       exam: exam 
     });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to create complementary exam', error: err.message });
-    console.error(err);
+    console.error('Error creating exam:', err);
+    res.status(500).json({ 
+      message: 'Erreur lors de la création de l\'examen', 
+      error: err.message 
+    });
   }
 };
 
@@ -115,31 +198,48 @@ export const updateComplementaryExam = async (req, res) => {
     });
 
     if (!existingExam) {
-      return res.status(404).json({ message: 'Exam not found or does not belong to your patient' });
+      return res.status(404).json({ 
+        message: 'Examen non trouvé ou n\'appartient pas à votre patient' 
+      });
     }
+
+    // Prepare update data
+    const updateData = {};
+    if (type !== undefined) updateData.type = type;
+    if (description !== undefined) updateData.description = description;
+    if (date !== undefined) updateData.date = new Date(date);
 
     // Update exam
     const updatedExam = await prisma.complementaryExam.update({
       where: {
         id: parseInt(examId)
       },
-      data: {
-        type: type || existingExam.type,
-        description: description || existingExam.description,
-        date: date ? new Date(date) : existingExam.date
-      },
+      data: updateData,
       include: {
-        files: true
+        patient: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        },
+        files: {
+          orderBy: {
+            uploadDate: 'desc'
+          }
+        }
       }
     });
 
     res.status(200).json({ 
-      message: 'Complementary exam updated successfully',
+      message: 'Examen complémentaire modifié avec succès',
       exam: updatedExam 
     });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to update complementary exam', error: err.message });
-    console.error(err);
+    console.error('Error updating exam:', err);
+    res.status(500).json({ 
+      message: 'Erreur lors de la modification de l\'examen', 
+      error: err.message 
+    });
   }
 };
 
@@ -163,15 +263,19 @@ export const deleteComplementaryExam = async (req, res) => {
     });
 
     if (!existingExam) {
-      return res.status(404).json({ message: 'Exam not found or does not belong to your patient' });
+      return res.status(404).json({ 
+        message: 'Examen non trouvé ou n\'appartient pas à votre patient' 
+      });
     }
 
     // Delete associated files from filesystem
+    let filesDeleted = 0;
     for (const file of existingExam.files) {
       try {
         const filePath = path.join(__dirname, '../../', file.fileUrl);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
+          filesDeleted++;
         }
       } catch (fileErr) {
         console.error('Error deleting file:', fileErr);
@@ -187,12 +291,16 @@ export const deleteComplementaryExam = async (req, res) => {
     });
 
     res.status(200).json({ 
-      message: 'Complementary exam deleted successfully',
-      examId: parseInt(examId)
+      message: 'Examen complémentaire supprimé avec succès',
+      examId: parseInt(examId),
+      filesDeleted: filesDeleted
     });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to delete complementary exam', error: err.message });
-    console.error(err);
+    console.error('Error deleting exam:', err);
+    res.status(500).json({ 
+      message: 'Erreur lors de la suppression de l\'examen', 
+      error: err.message 
+    });
   }
 };
 
@@ -203,7 +311,7 @@ export const uploadExamFile = async (req, res) => {
 
   try {
     if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
+      return res.status(400).json({ message: 'Aucun fichier uploadé' });
     }
 
     // Verify that exam exists and belongs to a patient of this medecin
@@ -213,11 +321,29 @@ export const uploadExamFile = async (req, res) => {
         patient: {
           medecinId: medecinId
         }
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        }
       }
     });
 
     if (!existingExam) {
-      return res.status(404).json({ message: 'Exam not found or does not belong to your patient' });
+      // Delete uploaded file if exam not found
+      if (req.file && req.file.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (fileErr) {
+          console.error('Error deleting uploaded file:', fileErr);
+        }
+      }
+      return res.status(404).json({ 
+        message: 'Examen non trouvé ou n\'appartient pas à votre patient' 
+      });
     }
 
     // Create file record
@@ -232,20 +358,28 @@ export const uploadExamFile = async (req, res) => {
     });
 
     res.status(201).json({ 
-      message: 'File uploaded successfully',
-      file: examFile 
+      message: 'Fichier uploadé avec succès',
+      file: examFile,
+      exam: {
+        id: existingExam.id,
+        type: existingExam.type,
+        patient: existingExam.patient
+      }
     });
   } catch (err) {
     // Delete uploaded file if database operation fails
-    if (req.file) {
+    if (req.file && req.file.path) {
       try {
         fs.unlinkSync(req.file.path);
       } catch (fileErr) {
         console.error('Error deleting uploaded file:', fileErr);
       }
     }
-    res.status(500).json({ message: 'Failed to upload file', error: err.message });
-    console.error(err);
+    console.error('Error uploading file:', err);
+    res.status(500).json({ 
+      message: 'Erreur lors de l\'upload du fichier', 
+      error: err.message 
+    });
   }
 };
 
@@ -264,12 +398,25 @@ export const deleteExamFile = async (req, res) => {
             medecinId: medecinId
           }
         }
+      },
+      include: {
+        exam: {
+          select: {
+            id: true,
+            type: true
+          }
+        }
       }
     });
 
     if (!existingFile) {
-      return res.status(404).json({ message: 'File not found or does not belong to your patient' });
+      return res.status(404).json({ 
+        message: 'Fichier non trouvé ou n\'appartient pas à votre patient' 
+      });
     }
+
+    const fileName = existingFile.fileName;
+    const examInfo = existingFile.exam;
 
     // Delete file from filesystem
     try {
@@ -290,11 +437,16 @@ export const deleteExamFile = async (req, res) => {
     });
 
     res.status(200).json({ 
-      message: 'File deleted successfully',
-      fileId: parseInt(fileId)
+      message: 'Fichier supprimé avec succès',
+      fileId: parseInt(fileId),
+      fileName: fileName,
+      exam: examInfo
     });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to delete file', error: err.message });
-    console.error(err);
+    console.error('Error deleting file:', err);
+    res.status(500).json({ 
+      message: 'Erreur lors de la suppression du fichier', 
+      error: err.message 
+    });
   }
 };

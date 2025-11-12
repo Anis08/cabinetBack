@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import {
   getComplementaryExams,
+  getComplementaryExamById,
   createComplementaryExam,
   updateComplementaryExam,
   deleteComplementaryExam,
@@ -60,6 +61,7 @@ const upload = multer({
 
 // Complementary exam routes (all require authentication)
 router.get('/patient/:patientId', verifyAccessToken, getComplementaryExams);
+router.get('/:examId', verifyAccessToken, getComplementaryExamById);
 router.post('/', verifyAccessToken, createComplementaryExam);
 router.put('/:examId', verifyAccessToken, updateComplementaryExam);
 router.delete('/:examId', verifyAccessToken, deleteComplementaryExam);

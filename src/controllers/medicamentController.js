@@ -43,17 +43,33 @@ export const getAllMedicaments = async (req, res) => {
       orderBy: {
         nom: 'asc'
       },
-      select: {
-        id: true,
-        nom: true,
-        dosage: true,
-        forme: true,
-        fabricant: true,
-        moleculeMere: true,
-        type: true,
-        frequence: true,
-        createdAt: true,
-        medecinId: true
+      include: {
+        medecin: {
+          select: {
+            id: true,
+            fullName: true,
+            speciality: true
+          }
+        },
+        ordonnanceMedicaments: {
+          select: {
+            id: true,
+            ordonnanceId: true,
+            posologie: true,
+            duree: true
+          },
+          take: 5 // Limit to last 5 usages
+        },
+        demandeMedicaments: {
+          select: {
+            id: true,
+            status: true,
+            createdAt: true
+          },
+          where: {
+            status: 'EnAttente'
+          }
+        }
       }
     });
     
@@ -103,15 +119,18 @@ export const searchMedicaments = async (req, res) => {
       orderBy: {
         nom: 'asc'
       },
-      select: {
-        id: true,
-        nom: true,
-        dosage: true,
-        forme: true,
-        fabricant: true,
-        moleculeMere: true,
-        type: true,
-        frequence: true
+      include: {
+        medecin: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        },
+        _count: {
+          select: {
+            ordonnanceMedicaments: true
+          }
+        }
       }
     });
     
@@ -142,18 +161,67 @@ export const getMedicamentById = async (req, res) => {
     
     const medicament = await prisma.medicament.findUnique({
       where: { id: medicamentId },
-      select: {
-        id: true,
-        nom: true,
-        dosage: true,
-        forme: true,
-        fabricant: true,
-        moleculeMere: true,
-        type: true,
-        frequence: true,
-        createdAt: true,
-        updatedAt: true,
-        medecinId: true
+      include: {
+        medecin: {
+          select: {
+            id: true,
+            fullName: true,
+            speciality: true,
+            phoneNumber: true,
+            email: true
+          }
+        },
+        ordonnanceMedicaments: {
+          select: {
+            id: true,
+            ordonnanceId: true,
+            posologie: true,
+            duree: true,
+            instructions: true,
+            ordonnance: {
+              select: {
+                id: true,
+                dateCreation: true,
+                patient: {
+                  select: {
+                    id: true,
+                    fullName: true
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            ordonnance: {
+              dateCreation: 'desc'
+            }
+          },
+          take: 10 // Last 10 usages
+        },
+        demandeMedicaments: {
+          select: {
+            id: true,
+            status: true,
+            motifRejet: true,
+            createdAt: true,
+            dateTraitement: true,
+            medecin: {
+              select: {
+                id: true,
+                fullName: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        },
+        _count: {
+          select: {
+            ordonnanceMedicaments: true,
+            demandeMedicaments: true
+          }
+        }
       }
     });
     
@@ -218,16 +286,20 @@ export const createMedicament = async (req, res) => {
         frequence: frequence || '3 fois par jour',
         medecinId // Peut être null pour les médicaments globaux
       },
-      select: {
-        id: true,
-        nom: true,
-        dosage: true,
-        forme: true,
-        fabricant: true,
-        moleculeMere: true,
-        type: true,
-        frequence: true,
-        createdAt: true
+      include: {
+        medecin: {
+          select: {
+            id: true,
+            fullName: true,
+            speciality: true
+          }
+        },
+        _count: {
+          select: {
+            ordonnanceMedicaments: true,
+            demandeMedicaments: true
+          }
+        }
       }
     });
     
@@ -305,16 +377,20 @@ export const updateMedicament = async (req, res) => {
         type,
         frequence: frequence || existingMedicament.frequence
       },
-      select: {
-        id: true,
-        nom: true,
-        dosage: true,
-        forme: true,
-        fabricant: true,
-        moleculeMere: true,
-        type: true,
-        frequence: true,
-        updatedAt: true
+      include: {
+        medecin: {
+          select: {
+            id: true,
+            fullName: true,
+            speciality: true
+          }
+        },
+        _count: {
+          select: {
+            ordonnanceMedicaments: true,
+            demandeMedicaments: true
+          }
+        }
       }
     });
     

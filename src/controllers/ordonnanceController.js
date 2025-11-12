@@ -287,7 +287,6 @@ export const createOrdonnance = async (req, res) => {
   try {
     const { patientId, rendezVousId, dateValidite, note, medicaments } = req.body;
 
-    console.log(req.body)
     
     // Validation
     if (!patientId || !medicaments || !Array.isArray(medicaments) || medicaments.length === 0) {
@@ -347,59 +346,14 @@ export const createOrdonnance = async (req, res) => {
           medicamentId: parseInt(medicamentId),
           posologie: posologie,
           duree: med.duree || null,
-          instructions: med.instructions || med.momentPrise || null
+          instructions: med.instructions || med.momentPrise || null,
+          forme: med.forme || null,
+          dosage: med.dosage || null
         });
         continue;
       }
       
-      // Si pas d'ID mais qu'on a les données du médicament, chercher ou créer
-      if (med.nom && med.dosage && med.forme) {
-        // Vérifier si le médicament existe déjà
-        const existingMed = await prisma.medicament.findFirst({
-          where: {
-            nom: med.nom,
-            dosage: med.dosage,
-            forme: med.forme
-          }
-        });
-        
-        if (existingMed) {
-          medicamentsData.push({
-            medicamentId: existingMed.id,
-            posologie: posologie,
-            duree: med.duree || null,
-            instructions: med.instructions || med.momentPrise || null
-          });
-        } else {
-          // Créer une demande d'ajout si on a toutes les infos nécessaires
-          if (med.fabricant && med.moleculeMere && med.type) {
-            const demande = await prisma.demandeMedicament.create({
-              data: {
-                nom: med.nom,
-                dosage: med.dosage,
-                forme: med.forme,
-                fabricant: med.fabricant,
-                moleculeMere: med.moleculeMere,
-                type: med.type,
-                frequence: posologie,
-                medecinId,
-                status: 'EnAttente'
-              }
-            });
-            
-            demandesCreated.push(demande);
-          } else {
-            // Données incomplètes
-            return res.status(400).json({
-              message: `Données incomplètes pour le médicament: ${med.nom}. Fabricant, molécule mère et type sont requis.`
-            });
-          }
-        }
-      } else {
-        return res.status(400).json({
-          message: 'Chaque médicament doit avoir soit un ID, soit nom + dosage + forme'
-        });
-      }
+      
     }
     
     // Créer l'ordonnance seulement si on a au moins un médicament validé

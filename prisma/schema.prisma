@@ -188,6 +188,7 @@ model Dosage {
   valeur        String       // ex: "500 mg", "1 g/125 mg"
   medicamentId  Int
   Medicament    Medicament   @relation(fields: [medicamentId], references: [id])
+
 }
 
 model moleculeMere {
@@ -225,7 +226,9 @@ model OrdonnanceMedicament {
   posologie       String      // "1 comprimé 3 fois par jour"
   duree           String?     // "7 jours", "1 mois"
   instructions    String?     @db.Text // Instructions spécifiques
-  
+  forme          String?     // "Comprimé", "Sirop", etc.
+  dosage          String?       // Référence au dosage spécifique
+
   ordonnance      Ordonnance  @relation(fields: [ordonnanceId], references: [id], onDelete: Cascade)
   medicament      Medicament  @relation(fields: [medicamentId], references: [id])
   

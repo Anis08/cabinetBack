@@ -970,98 +970,104 @@ export const getPatientProfile = async (req, res) => {
   const medecinId = req.medecinId;
   const patientId = req.params.id;
   try {
-
-    const [patient, nextAppointment, ordonnances] = await prisma.$transaction([
+    // Get patient and next appointment first (essential data)
+    const [patient, nextAppointment] = await prisma.$transaction([
       prisma.patient.findUnique({
-      where: {
-        id: parseInt(patientId)
-      },
-      select: {
-        id: true,
-        fullName: true,
-        phoneNumber: true,
-        email: true,
-        address: true,
-        gender: true,
-        poids: true,
-        taille: true,
-        dateOfBirth: true,
-        bio: true,
-        maladieChronique: true,
-        createdAt: true,
-        rendezVous: {
-          where: { state: 'Completed' },
-          select: {
-            id: true,
-            date: true,
-            startTime: true,
-            endTime: true,
-            state: true,
-            arrivalTime: true,
-            paid: true,
-            note: true,
-            poids: true,
-            pcm: true,
-            imc: true,
-            pulse: true,
-            paSystolique: true,
-            paDiastolique: true
-          },
-          orderBy: {
-            date: 'desc'
-          }
-        }
-      }
-    }),
-    prisma.rendezVous.findFirst({
-      where: {
-        patientId: parseInt(patientId),
-        medecinId,
-        state: { in: ['Scheduled', 'Waiting', 'InProgress']},
-      },
-      orderBy:{
-        date: 'asc'
-      }
-    }),
-    prisma.ordonnance.findMany({
-      where: {
-        patientId: parseInt(patientId),
-        medecinId
-      },
-      orderBy: {
-        dateCreation: 'desc'
-      },
-      select: {
-        id: true,
-        dateCreation: true,
-        dateValidite: true,
-        note: true,
-        rendezVousId: true,
-        medicaments: {
-          select: {
-            medicament: {
-              select: {
-                id: true,
-                nom: true,
-                dosage: true,
-                forme: true,
-                type: true
-              }
+        where: {
+          id: parseInt(patientId)
+        },
+        select: {
+          id: true,
+          fullName: true,
+          phoneNumber: true,
+          email: true,
+          address: true,
+          gender: true,
+          poids: true,
+          taille: true,
+          dateOfBirth: true,
+          bio: true,
+          maladieChronique: true,
+          createdAt: true,
+          rendezVous: {
+            where: { state: 'Completed' },
+            select: {
+              id: true,
+              date: true,
+              startTime: true,
+              endTime: true,
+              state: true,
+              arrivalTime: true,
+              paid: true,
+              note: true,
+              poids: true,
+              pcm: true,
+              imc: true,
+              pulse: true,
+              paSystolique: true,
+              paDiastolique: true
             },
-            posologie: true,
-            duree: true,
-            instructions: true
+            orderBy: {
+              date: 'desc'
+            }
           }
         }
-      }
-    })
-  ])
+      }),
+      prisma.rendezVous.findFirst({
+        where: {
+          patientId: parseInt(patientId),
+          medecinId,
+          state: { in: ['Scheduled', 'Waiting', 'InProgress']},
+        },
+        orderBy:{
+          date: 'asc'
+        }
+      })
+    ]);
 
     if (!patient) {
       return res.status(404).json({ message: 'No patients found' });
     }
 
- 
+    // Try to fetch ordonnances (optional - may fail if tables don't exist)
+    let ordonnances = [];
+    try {
+      ordonnances = await prisma.ordonnance.findMany({
+        where: {
+          patientId: parseInt(patientId),
+          medecinId
+        },
+        orderBy: {
+          dateCreation: 'desc'
+        },
+        select: {
+          id: true,
+          dateCreation: true,
+          dateValidite: true,
+          note: true,
+          rendezVousId: true,
+          medicaments: {
+            select: {
+              medicament: {
+                select: {
+                  id: true,
+                  nom: true,
+                  dosage: true,
+                  forme: true,
+                  type: true
+                }
+              },
+              posologie: true,
+              duree: true,
+              instructions: true
+            }
+          }
+        }
+      });
+    } catch (ordError) {
+      console.warn('Could not fetch ordonnances for patient', patientId, ':', ordError.message);
+      // Continue without ordonnances - they're optional
+    }
 
     res.status(200).json({
       patient, 
@@ -1069,8 +1075,8 @@ export const getPatientProfile = async (req, res) => {
       ordonnances
     });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to list patients', error: err.message });
-    console.error(err);
+    console.error('Error in getPatientProfile:', err);
+    res.status(500).json({ message: 'Failed to get patient profile', error: err.message });
   }
 }
 

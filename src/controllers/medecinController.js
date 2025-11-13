@@ -4,6 +4,7 @@ import prisma from "../prisma.js";
 import { startOfDay } from 'date-fns';
 import { da } from 'date-fns/locale';
 import { triggerWaitingLineUpdate } from '../services/websocketService.js';
+import { calculateBSA, enrichPatientWithCalculations, enrichVitalSignsWithBSA } from '../utils/vitalSignsCalculations.js';
 
 
 
@@ -213,8 +214,14 @@ export const listTodayAppointments = async (req, res) => {
       ]
     });
 
+    // Enrichir chaque rendez-vous avec le BSA calculé
+    const enrichedAppointments = todayAppointments.map(apt => ({
+      ...apt,
+      bsa: calculateBSA(apt.poids, apt.patient?.taille)
+    }));
+
     // Return empty array instead of 404 when no appointments
-    res.status(200).json({ todayAppointments: todayAppointments || [] });
+    res.status(200).json({ todayAppointments: enrichedAppointments || [] });
   } catch (err) {
     res.status(500).json({ message: 'Failed to list today appointments', error: err.message });
     console.error(err);
@@ -699,6 +706,10 @@ export const getCompletedAppointments = async (req, res) => {
       if (apt.patient.taille) vitalSigns.height = apt.patient.taille;
       if (apt.imc) vitalSigns.bmi = apt.imc;
       if (apt.pcm) vitalSigns.pcm = apt.pcm;
+      
+      // Calculer et ajouter le BSA (Body Surface Area)
+      const bsa = calculateBSA(apt.poids, apt.patient.taille);
+      if (bsa) vitalSigns.bsa = bsa;
 
       // Get biological tests for this patient around this consultation date
       const patientBioRequests = biologicalRequests.filter(br => br.patientId === apt.patient.id);
@@ -873,6 +884,10 @@ export const getCompletedAppointmentsGrouped = async (req, res) => {
       if (apt.patient.taille) vitalSigns.height = apt.patient.taille;
       if (apt.imc) vitalSigns.bmi = apt.imc;
       if (apt.pcm) vitalSigns.pcm = apt.pcm;
+      
+      // Calculer et ajouter le BSA (Body Surface Area)
+      const bsa = calculateBSA(apt.poids, apt.patient.taille);
+      if (bsa) vitalSigns.bsa = bsa;
 
       // Get biological tests for this patient around this consultation date
       const patientBioRequests = biologicalRequests.filter(br => br.patientId === apt.patient.id);
@@ -1012,6 +1027,10 @@ export const getHistory = async (req, res) => {
       if (apt.patient.taille) vitalSigns.height = apt.patient.taille;
       if (apt.imc) vitalSigns.bmi = apt.imc;
       if (apt.pcm) vitalSigns.pcm = apt.pcm;
+      
+      // Calculer et ajouter le BSA (Body Surface Area)
+      const bsa = calculateBSA(apt.poids, apt.patient.taille);
+      if (bsa) vitalSigns.bsa = bsa;
 
       // Get biological tests for this patient
       const patientBioRequests = biologicalRequests.filter(br => br.patientId === apt.patient.id);
@@ -1201,8 +1220,22 @@ export const getPatientProfile = async (req, res) => {
       // Continue without ordonnances - they're optional
     }
 
+    // Calculer le BSA du patient avec ses données actuelles
+    const patientWithBSA = {
+      ...patient,
+      bsa: calculateBSA(patient.poids, patient.taille)
+    };
+
+    // Enrichir chaque rendez-vous complété avec le BSA calculé
+    if (patientWithBSA.rendezVous && patientWithBSA.rendezVous.length > 0) {
+      patientWithBSA.rendezVous = patientWithBSA.rendezVous.map(rdv => ({
+        ...rdv,
+        bsa: calculateBSA(rdv.poids, patient.taille) // Utiliser le poids du rdv et la taille du patient
+      }));
+    }
+
     res.status(200).json({
-      patient, 
+      patient: patientWithBSA, 
       nextAppointment,
       ordonnances
     });

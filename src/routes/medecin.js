@@ -23,7 +23,8 @@ import {
   getHistory,
   getDashboardKPIs,
   returnToQueue,
-  removeFromWaitingQueue
+  removeFromWaitingQueue,
+  updateRendezVousNote
 } from '../controllers/medecinController.js';
 import { verifyAccessToken } from '../middleware/verifyAccessToken.js';
 import { PrismaClient } from '@prisma/client';
@@ -54,6 +55,9 @@ router.get('/test', test)
 // Patient management routes
 router.put('/patients/:id', verifyAccessToken, updatePatient);
 router.delete('/patients/:id', verifyAccessToken, deletePatient);
+
+// Rendez-vous management routes
+router.put('/rendez-vous/:rendezVousId/note', verifyAccessToken, updateRendezVousNote);
 
 // Biological request routes
 router.get('/biological-requests/:patientId', verifyAccessToken, getBiologicalRequests);

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { uploadExamsToGoogleDrive, deleteFromGoogleDrive } from '../services/googleDriveService.js';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -196,6 +197,29 @@ export const deleteComplementaryExam = async (req, res) => {
   }
 };
 
+export const uploadAdFile = async (req, res) => {
+  try {
+    
+    res.status(200).json({
+      message: 'File uploaded successfully to Google Drive',
+      url: id, //store the id of the url to build it in the front end
+      fileId: uploadResult.fileId,
+      directLink: uploadResult.directLink,
+      webViewLink: uploadResult.webViewLink,
+      filename: uniqueFileName,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    });
+
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    res.status(500).json({
+      message: 'Failed to upload file to Google Drive',
+      error: error.message
+    });
+  }
+};
+
 // Upload file for an exam
 export const uploadExamFile = async (req, res) => {
   const medecinId = req.medecinId;
@@ -205,6 +229,21 @@ export const uploadExamFile = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomStr = Math.round(Math.random() * 1E9);
+    const fileExtension = path.extname(req.file.originalname);
+    const uniqueFileName = `exam-${timestamp}-${randomStr}${fileExtension}`;
+
+    // Upload to Google Drive
+    const uploadResult = await uploadExamsToGoogleDrive(
+      req.file.buffer,
+      uniqueFileName,
+      req.file.mimetype
+    );
+
+    const id = new URL(uploadResult.url).searchParams.get('id');
 
     // Verify that exam exists and belongs to a patient of this medecin
     const existingExam = await prisma.complementaryExam.findFirst({
@@ -225,7 +264,7 @@ export const uploadExamFile = async (req, res) => {
       data: {
         examId: parseInt(examId),
         fileName: req.file.originalname,
-        fileUrl: `uploads/exams/${req.file.filename}`,
+        fileUrl: id,
         fileType: req.file.mimetype,
         fileSize: req.file.size
       }
@@ -237,13 +276,7 @@ export const uploadExamFile = async (req, res) => {
     });
   } catch (err) {
     // Delete uploaded file if database operation fails
-    if (req.file) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (fileErr) {
-        console.error('Error deleting uploaded file:', fileErr);
-      }
-    }
+    console.error('Error uploading file for exam:', err);
     res.status(500).json({ message: 'Failed to upload file', error: err.message });
     console.error(err);
   }
@@ -271,15 +304,10 @@ export const deleteExamFile = async (req, res) => {
       return res.status(404).json({ message: 'File not found or does not belong to your patient' });
     }
 
-    // Delete file from filesystem
-    try {
-      const filePath = path.join(__dirname, '../../', existingFile.fileUrl);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    } catch (fileErr) {
-      console.error('Error deleting file from filesystem:', fileErr);
-      // Continue with database deletion even if file removal fails
+    const deletedFromDrive = await deleteFromGoogleDrive(existingFile.fileUrl);
+
+    if (!deletedFromDrive) {
+      return res.status(500).json({ message: 'Failed to delete file from Google Drive' });
     }
 
     // Delete file record from database

@@ -82,6 +82,68 @@ export const uploadToGoogleDrive = async (fileBuffer, fileName, mimeType) => {
   }
 };
 
+
+export const uploadExamsToGoogleDrive = async (fileBuffer, fileName, mimeType) => {
+  try {
+    const drive = initializeDrive();
+
+    // Get or create ads folder
+    const folderId = await getOrCreateExamsFolder(drive);
+
+    // Create a readable stream from buffer
+    const bufferStream = new Readable();
+    bufferStream.push(fileBuffer);
+    bufferStream.push(null);
+
+    // Upload file metadata
+    const fileMetadata = {
+      name: fileName,
+      parents: [folderId]
+    };
+
+    const media = {
+      mimeType: mimeType,
+      body: bufferStream
+    };
+
+    // Upload file
+    const response = await drive.files.create({
+      requestBody: fileMetadata,
+      media: media,
+      fields: 'id, name, mimeType, webViewLink, webContentLink'
+    });
+
+    // Make file publicly accessible
+    await drive.permissions.create({
+      fileId: response.data.id,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone'
+      }
+    });
+
+    // Get the direct download link
+    const file = await drive.files.get({
+      fileId: response.data.id,
+      fields: 'id, webViewLink, webContentLink'
+    });
+
+    // Construct direct link for public access
+    const directLink = `https://drive.google.com/uc?export=view&id=${response.data.id}`;
+
+    return {
+      fileId: response.data.id,
+      fileName: fileName,
+      url: directLink, // Store only the direct link
+      // Optionally, you can still return webViewLink/webContentLink if needed
+    };
+
+  } catch (error) {
+    console.error('Error uploading to Google Drive:', error);
+    throw new Error(`Failed to upload to Google Drive: ${error.message}`);
+  }
+};
+
 /**
  * Delete file from Google Drive
  */
@@ -106,6 +168,35 @@ export const deleteFromGoogleDrive = async (fileId) => {
  */
 const getOrCreateAdsFolder = async (drive) => {
   const folderName = 'MedicalAds';
+
+  // Search for the folder in My Drive
+  const response = await drive.files.list({
+    q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    fields: 'files(id, name)',
+    spaces: 'drive'
+  });
+
+  if (response.data.files.length > 0) {
+    return response.data.files[0].id;
+  }
+
+  // Create folder if it doesn't exist
+  const folderMetadata = {
+    name: folderName,
+    mimeType: 'application/vnd.google-apps.folder'
+  };
+
+  const folder = await drive.files.create({
+    requestBody: folderMetadata,
+    fields: 'id'
+  });
+
+  return folder.data.id;
+};
+
+
+const getOrCreateExamsFolder = async (drive) => {
+  const folderName = 'ExamensComplemantaires';
 
   // Search for the folder in My Drive
   const response = await drive.files.list({

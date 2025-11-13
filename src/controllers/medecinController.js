@@ -1116,10 +1116,37 @@ export const getPatientProfile = async (req, res) => {
       // Continue without ordonnances - they're optional
     }
 
+    let exams = [];
+    try {
+      exams = await prisma.complementaryExam.findMany({
+        where: {
+          patientId: parseInt(patientId),
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        select: {
+          id: true,
+          patientId: true,
+          type: true,    
+          description: true,       
+          date: true,
+          createdAt: true,  
+          files: true,          
+          
+          
+        }
+      });
+    } catch (ordError) {
+      console.warn('Could not fetch ordonnances for patient', patientId, ':', ordError.message);
+      // Continue without ordonnances - they're optional
+    }
+
     res.status(200).json({
       patient, 
       nextAppointment,
-      ordonnances
+      ordonnances,
+      exams
     });
   } catch (err) {
     console.error('Error in getPatientProfile:', err);

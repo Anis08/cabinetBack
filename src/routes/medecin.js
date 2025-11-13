@@ -22,7 +22,8 @@ import {
   getStatistics, 
   getHistory,
   getDashboardKPIs,
-  returnToQueue
+  returnToQueue,
+  returnToAbsent
 } from '../controllers/medecinController.js';
 import { verifyAccessToken } from '../middleware/verifyAccessToken.js';
 import { PrismaClient } from '@prisma/client';
@@ -34,6 +35,7 @@ router.post('/create-patient', verifyAccessToken, newPatient);
 router.post('/add-appointment', verifyAccessToken, newRendezVous);
 router.post('/add-to-waiting', verifyAccessToken, addToWaitingList);
 router.post('/return-queue', verifyAccessToken, returnToQueue);
+router.post('/return-absent', verifyAccessToken, returnToAbsent);
 router.post('/add-to-actif', verifyAccessToken, addToInProgress);
 router.post('/finish-consultation', verifyAccessToken, finishConsultation);
 router.post('/add-to-waiting-today', verifyAccessToken, addToWaitingListToday);

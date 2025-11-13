@@ -4,6 +4,7 @@ import prisma from "../prisma.js";
 import { startOfDay } from 'date-fns';
 import { da } from 'date-fns/locale';
 import { triggerWaitingLineUpdate } from '../services/websocketService.js';
+import { calculateBSA, enrichPatientWithCalculations, enrichVitalSignsWithBSA } from '../utils/vitalSignsCalculations.js';
 
 
 
@@ -213,8 +214,14 @@ export const listTodayAppointments = async (req, res) => {
       ]
     });
 
+    // Enrichir chaque rendez-vous avec le BSA calculé
+    const enrichedAppointments = todayAppointments.map(apt => ({
+      ...apt,
+      bsa: calculateBSA(apt.poids, apt.patient?.taille)
+    }));
+
     // Return empty array instead of 404 when no appointments
-    res.status(200).json({ todayAppointments: todayAppointments || [] });
+    res.status(200).json({ todayAppointments: enrichedAppointments || [] });
   } catch (err) {
     res.status(500).json({ message: 'Failed to list today appointments', error: err.message });
     console.error(err);
@@ -541,6 +548,91 @@ export const finishConsultation = async (req, res) => {
   }
 }
 
+// Supprimer un patient de la file d'attente en le marquant comme ayant terminé sa consultation
+export const removeFromWaitingQueue = async (req, res) => {
+  const medecinId = req.medecinId;
+  const { rendezVousId } = req.body;
+
+  try {
+    if (!rendezVousId) {
+      return res.status(400).json({ message: 'Le rendez-vous ID est requis' });
+    }
+
+    // Vérifier que le rendez-vous existe et appartient au médecin
+    const rendezVous = await prisma.rendezVous.findFirst({
+      where: {
+        id: rendezVousId,
+        medecinId: medecinId
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        }
+      }
+    });
+
+    if (!rendezVous) {
+      return res.status(404).json({ 
+        message: 'Rendez-vous non trouvé ou n\'appartient pas à ce médecin' 
+      });
+    }
+
+    // Vérifier que le rendez-vous est bien dans la file d'attente (Waiting)
+    if (rendezVous.state !== 'Waiting') {
+      return res.status(400).json({ 
+        message: `Le rendez-vous doit être en attente pour être supprimé de la file. État actuel: ${rendezVous.state}` 
+      });
+    }
+
+    // Marquer le rendez-vous comme terminé sans les détails de consultation
+    const completed = await prisma.rendezVous.update({
+      where: {
+        id: rendezVousId,
+      },
+      data: {
+        state: 'Completed',
+        endTime: new Date(),
+        // On ne met pas startTime si elle n'existe pas déjà
+        startTime: rendezVous.startTime || new Date(),
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            fullName: true,
+            phoneNumber: true
+          }
+        }
+      }
+    });
+
+    // Trigger WebSocket update pour mettre à jour la file d'attente publique
+    triggerWaitingLineUpdate();
+
+    res.status(200).json({ 
+      message: 'Patient retiré de la file d\'attente et marqué comme consultation terminée',
+      rendezVous: {
+        id: completed.id,
+        patientName: completed.patient.fullName,
+        state: completed.state,
+        arrivalTime: completed.arrivalTime,
+        startTime: completed.startTime,
+        endTime: completed.endTime
+      }
+    });
+
+  } catch (err) {
+    console.error('Error removing from waiting queue:', err);
+    res.status(500).json({ 
+      message: 'Erreur lors de la suppression de la file d\'attente', 
+      error: err.message 
+    });
+  }
+};
+
 
 
 export const getCompletedAppointments = async (req, res) => {
@@ -663,6 +755,10 @@ export const getCompletedAppointments = async (req, res) => {
       if (apt.patient.taille) vitalSigns.height = apt.patient.taille;
       if (apt.imc) vitalSigns.bmi = apt.imc;
       if (apt.pcm) vitalSigns.pcm = apt.pcm;
+      
+      // Calculer et ajouter le BSA (Body Surface Area)
+      const bsa = calculateBSA(apt.poids, apt.patient.taille);
+      if (bsa) vitalSigns.bsa = bsa;
 
       // Get biological tests for this patient around this consultation date
       const patientBioRequests = biologicalRequests.filter(br => br.patientId === apt.patient.id);
@@ -837,6 +933,10 @@ export const getCompletedAppointmentsGrouped = async (req, res) => {
       if (apt.patient.taille) vitalSigns.height = apt.patient.taille;
       if (apt.imc) vitalSigns.bmi = apt.imc;
       if (apt.pcm) vitalSigns.pcm = apt.pcm;
+      
+      // Calculer et ajouter le BSA (Body Surface Area)
+      const bsa = calculateBSA(apt.poids, apt.patient.taille);
+      if (bsa) vitalSigns.bsa = bsa;
 
       // Get biological tests for this patient around this consultation date
       const patientBioRequests = biologicalRequests.filter(br => br.patientId === apt.patient.id);
@@ -976,6 +1076,10 @@ export const getHistory = async (req, res) => {
       if (apt.patient.taille) vitalSigns.height = apt.patient.taille;
       if (apt.imc) vitalSigns.bmi = apt.imc;
       if (apt.pcm) vitalSigns.pcm = apt.pcm;
+      
+      // Calculer et ajouter le BSA (Body Surface Area)
+      const bsa = calculateBSA(apt.poids, apt.patient.taille);
+      if (bsa) vitalSigns.bsa = bsa;
 
       // Get biological tests for this patient
       const patientBioRequests = biologicalRequests.filter(br => br.patientId === apt.patient.id);
@@ -1165,6 +1269,7 @@ export const getPatientProfile = async (req, res) => {
       // Continue without ordonnances - they're optional
     }
 
+<<<<<<< HEAD
     let exams = [];
     try {
       exams = await prisma.complementaryExam.findMany({
@@ -1189,10 +1294,24 @@ export const getPatientProfile = async (req, res) => {
     } catch (ordError) {
       console.warn('Could not fetch ordonnances for patient', patientId, ':', ordError.message);
       // Continue without ordonnances - they're optional
+=======
+    // Calculer le BSA du patient avec ses données actuelles
+    const patientWithBSA = {
+      ...patient,
+      bsa: calculateBSA(patient.poids, patient.taille)
+    };
+
+    // Enrichir chaque rendez-vous complété avec le BSA calculé
+    if (patientWithBSA.rendezVous && patientWithBSA.rendezVous.length > 0) {
+      patientWithBSA.rendezVous = patientWithBSA.rendezVous.map(rdv => ({
+        ...rdv,
+        bsa: calculateBSA(rdv.poids, patient.taille) // Utiliser le poids du rdv et la taille du patient
+      }));
+>>>>>>> f772dd4846966f60c4177aa485cd767be98191b3
     }
 
     res.status(200).json({
-      patient, 
+      patient: patientWithBSA, 
       nextAppointment,
       ordonnances,
       exams
@@ -1301,6 +1420,78 @@ export const deletePatient = async (req, res) => {
     console.error(err);
   }
 }
+
+// Update rendez-vous note
+export const updateRendezVousNote = async (req, res) => {
+  const medecinId = req.medecinId;
+  const rendezVousId = req.params.rendezVousId;
+  const { note } = req.body;
+
+  try {
+    // Validate rendezVousId
+    if (!rendezVousId) {
+      return res.status(400).json({ message: 'Le rendez-vous ID est requis' });
+    }
+
+    // Verify that rendez-vous exists and belongs to this medecin
+    const existingRendezVous = await prisma.rendezVous.findFirst({
+      where: {
+        id: parseInt(rendezVousId),
+        medecinId: medecinId
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        }
+      }
+    });
+
+    if (!existingRendezVous) {
+      return res.status(404).json({ 
+        message: 'Rendez-vous non trouvé ou n\'appartient pas à ce médecin' 
+      });
+    }
+
+    // Update the note
+    const updatedRendezVous = await prisma.rendezVous.update({
+      where: {
+        id: parseInt(rendezVousId)
+      },
+      data: {
+        note: note || null  // Allow clearing the note by passing empty string
+      },
+      select: {
+        id: true,
+        date: true,
+        state: true,
+        note: true,
+        startTime: true,
+        endTime: true,
+        patient: {
+          select: {
+            id: true,
+            fullName: true,
+            phoneNumber: true
+          }
+        }
+      }
+    });
+
+    res.status(200).json({ 
+      message: 'Note du rendez-vous modifiée avec succès',
+      rendezVous: updatedRendezVous
+    });
+  } catch (err) {
+    console.error('Error updating rendez-vous note:', err);
+    res.status(500).json({ 
+      message: 'Erreur lors de la modification de la note', 
+      error: err.message 
+    });
+  }
+};
 
 
 // Get all biological requests for a patient

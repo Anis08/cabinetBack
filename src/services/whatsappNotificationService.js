@@ -63,7 +63,7 @@ const generateAppointmentMessage = (patient, appointment, medecin) => {
 
 Bonjour ${patient.fullName},
 
-Ceci est un rappel pour votre rendez-vous chez ${medecin.fullName || 'Dr. ' + medecin.firstName + ' ' + medecin.lastName}.
+Ceci est un rappel pour votre rendez-vous chez ${medecin.fullName || 'Dr. ' + medecin.fullName}.
 
 📅 Date: ${dateStr}
 ⏰ Heure: ${timeStr}
@@ -115,8 +115,6 @@ export const sendAppointmentReminder = async (appointmentId) => {
         medecin: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
             fullName: true,
             price: true
           }
@@ -202,8 +200,6 @@ export const checkAndSendReminders = async () => {
         medecin: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
             fullName: true,
             price: true
           }

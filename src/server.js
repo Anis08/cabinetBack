@@ -28,7 +28,7 @@ const app = express();
 const httpServer = createServer(app);
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'],
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'https://69179854020e700008ee0183--cabinetfront.netlify.app'],
   credentials: true
 }));
 app.use(cookieParser());

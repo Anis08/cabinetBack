@@ -407,11 +407,9 @@ export const uploadExamFile = async (req, res) => {
     });
   } catch (err) {
     // Delete uploaded file if database operation fails
-<<<<<<< HEAD
     console.error('Error uploading file for exam:', err);
     res.status(500).json({ message: 'Failed to upload file', error: err.message });
     console.error(err);
-=======
     if (req.file && req.file.path) {
       try {
         fs.unlinkSync(req.file.path);
@@ -424,7 +422,6 @@ export const uploadExamFile = async (req, res) => {
       message: 'Erreur lors de l\'upload du fichier', 
       error: err.message 
     });
->>>>>>> f772dd4846966f60c4177aa485cd767be98191b3
   }
 };
 
@@ -460,12 +457,11 @@ export const deleteExamFile = async (req, res) => {
       });
     }
 
-<<<<<<< HEAD
     const deletedFromDrive = await deleteFromGoogleDrive(existingFile.fileUrl);
 
     if (!deletedFromDrive) {
       return res.status(500).json({ message: 'Failed to delete file from Google Drive' });
-=======
+    }
     const fileName = existingFile.fileName;
     const examInfo = existingFile.exam;
 
@@ -478,7 +474,6 @@ export const deleteExamFile = async (req, res) => {
     } catch (fileErr) {
       console.error('Error deleting file from filesystem:', fileErr);
       // Continue with database deletion even if file removal fails
->>>>>>> f772dd4846966f60c4177aa485cd767be98191b3
     }
 
     // Delete file record from database

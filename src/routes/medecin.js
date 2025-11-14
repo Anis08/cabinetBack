@@ -23,12 +23,9 @@ import {
   getHistory,
   getDashboardKPIs,
   returnToQueue,
-<<<<<<< HEAD
-  returnToAbsent
-=======
+  returnToAbsent,
   removeFromWaitingQueue,
   updateRendezVousNote
->>>>>>> f772dd4846966f60c4177aa485cd767be98191b3
 } from '../controllers/medecinController.js';
 import { verifyAccessToken } from '../middleware/verifyAccessToken.js';
 import { PrismaClient } from '@prisma/client';

@@ -1169,14 +1169,13 @@ export const addToWaitingListToday = async (req, res) =>  {
 
 export const getPatientProfile = async (req, res) => {
   const medecinId = req.medecinId;
-  const patientId = req.params.id;
+  const patientId = parseInt(req.params.id);
+
   try {
-    // Get patient and next appointment first (essential data)
+    // Fetch patient + next appointment
     const [patient, nextAppointment] = await prisma.$transaction([
       prisma.patient.findUnique({
-        where: {
-          id: parseInt(patientId)
-        },
+        where: { id: patientId },
         select: {
           id: true,
           fullName: true,
@@ -1191,7 +1190,7 @@ export const getPatientProfile = async (req, res) => {
           maladieChronique: true,
           createdAt: true,
           rendezVous: {
-            where: { state: 'Completed' },
+            where: { state: "Completed" },
             select: {
               id: true,
               date: true,
@@ -1206,41 +1205,33 @@ export const getPatientProfile = async (req, res) => {
               imc: true,
               pulse: true,
               paSystolique: true,
-              paDiastolique: true
+              paDiastolique: true,
             },
-            orderBy: {
-              date: 'desc'
-            }
-          }
-        }
+            orderBy: { date: "desc" },
+          },
+        },
       }),
+
       prisma.rendezVous.findFirst({
         where: {
-          patientId: parseInt(patientId),
+          patientId,
           medecinId,
-          state: { in: ['Scheduled', 'Waiting', 'InProgress']},
+          state: { in: ["Scheduled", "Waiting", "InProgress"] },
         },
-        orderBy:{
-          date: 'asc'
-        }
-      })
+        orderBy: { date: "asc" },
+      }),
     ]);
 
     if (!patient) {
-      return res.status(404).json({ message: 'No patients found' });
+      return res.status(404).json({ message: "No patients found" });
     }
 
-    // Try to fetch ordonnances (optional - may fail if tables don't exist)
+    // Fetch ordonnances (optional)
     let ordonnances = [];
     try {
       ordonnances = await prisma.ordonnance.findMany({
-        where: {
-          patientId: parseInt(patientId),
-          medecinId
-        },
-        orderBy: {
-          dateCreation: 'desc'
-        },
+        where: { patientId, medecinId },
+        orderBy: { dateCreation: "desc" },
         select: {
           id: true,
           dateCreation: true,
@@ -1254,73 +1245,73 @@ export const getPatientProfile = async (req, res) => {
               duree: true,
               instructions: true,
               medicament: {
-                select: {
-                  id: true,
-                  nom: true,
-                }
-              }
-            }
-          }
-          
-        }
+                select: { id: true, nom: true },
+              },
+            },
+          },
+        },
       });
-    } catch (ordError) {
-      console.warn('Could not fetch ordonnances for patient', patientId, ':', ordError.message);
-      // Continue without ordonnances - they're optional
+    } catch (err) {
+      console.warn(
+        "Could not fetch ordonnances for patient",
+        patientId,
+        ":",
+        err.message
+      );
     }
 
-<<<<<<< HEAD
+    // Fetch complementary exams (optional)
     let exams = [];
     try {
       exams = await prisma.complementaryExam.findMany({
-        where: {
-          patientId: parseInt(patientId),
-        },
-        orderBy: {
-          createdAt: 'desc'
-        },
+        where: { patientId },
+        orderBy: { createdAt: "desc" },
         select: {
           id: true,
           patientId: true,
-          type: true,    
-          description: true,       
+          type: true,
+          description: true,
           date: true,
-          createdAt: true,  
-          files: true,          
-          
-          
-        }
+          createdAt: true,
+          files: true,
+        },
       });
-    } catch (ordError) {
-      console.warn('Could not fetch ordonnances for patient', patientId, ':', ordError.message);
-      // Continue without ordonnances - they're optional
-=======
-    // Calculer le BSA du patient avec ses données actuelles
+    } catch (err) {
+      console.warn(
+        "Could not fetch complementary exams for patient",
+        patientId,
+        ":",
+        err.message
+      );
+    }
+
+    // ---- Compute BSA ----
     const patientWithBSA = {
       ...patient,
-      bsa: calculateBSA(patient.poids, patient.taille)
+      bsa: calculateBSA(patient.poids, patient.taille),
     };
 
-    // Enrichir chaque rendez-vous complété avec le BSA calculé
-    if (patientWithBSA.rendezVous && patientWithBSA.rendezVous.length > 0) {
-      patientWithBSA.rendezVous = patientWithBSA.rendezVous.map(rdv => ({
+    if (patientWithBSA.rendezVous?.length > 0) {
+      patientWithBSA.rendezVous = patientWithBSA.rendezVous.map((rdv) => ({
         ...rdv,
-        bsa: calculateBSA(rdv.poids, patient.taille) // Utiliser le poids du rdv et la taille du patient
+        bsa: calculateBSA(rdv.poids, patient.taille),
       }));
->>>>>>> f772dd4846966f60c4177aa485cd767be98191b3
     }
 
     res.status(200).json({
-      patient: patientWithBSA, 
+      patient: patientWithBSA,
       nextAppointment,
       ordonnances,
-      exams
+      exams,
     });
   } catch (err) {
-    console.error('Error in getPatientProfile:', err);
-    res.status(500).json({ message: 'Failed to get patient profile', error: err.message });
+    console.error("Error in getPatientProfile:", err);
+    res
+      .status(500)
+      .json({ message: "Failed to get patient profile", error: err.message });
   }
-}
+};
+
 
 // Update patient information
 export const updatePatient = async (req, res) => {

@@ -1485,6 +1485,89 @@ export const updateRendezVousNote = async (req, res) => {
 };
 
 
+export const updateRendezVousVitalSigns = async (req, res) => {
+  const medecinId = req.medecinId;
+  const rendezVousId = req.params.rendezVousId;
+  const { paSystolique, paDiastolique, poids, imc, pcm, pulse} = req.body;
+
+  try {
+    // Validate rendezVousId
+    if (!rendezVousId) {
+      return res.status(400).json({ message: 'Le rendez-vous ID est requis' });
+    }
+
+    // Verify that rendez-vous exists and belongs to this medecin
+    const existingRendezVous = await prisma.rendezVous.findFirst({
+      where: {
+        id: parseInt(rendezVousId),
+        medecinId: medecinId
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        }
+      }
+    });
+
+    if (!existingRendezVous) {
+      return res.status(404).json({ 
+        message: 'Rendez-vous non trouvé ou n\'appartient pas à ce médecin' 
+      });
+    }
+
+    // Update the note
+    const updatedRendezVous = await prisma.rendezVous.update({
+      where: {
+        id: parseInt(rendezVousId)
+      },
+      data: {
+        paSystolique: parseInt(paSystolique) || null,
+    paDiastolique: parseInt(paDiastolique) || null,
+    poids: parseFloat(poids) || null,
+    imc: parseFloat(imc) || null,
+    pcm: parseFloat(pcm) || null,
+    pulse: parseInt(pulse) || null, 
+      },
+      select: {
+        id: true,
+        date: true,
+        state: true,
+        note: true,
+        startTime: true,
+        endTime: true,
+        paDiastolique: true,
+        paSystolique: true,
+        poids: true,
+        imc: true,
+        pcm: true,
+        pulse: true,
+        patient: {
+          select: {
+            id: true,
+            fullName: true,
+            phoneNumber: true
+          }
+        }
+      }
+    });
+
+    res.status(200).json({ 
+      message: 'Note du rendez-vous modifiée avec succès',
+      rendezVous: updatedRendezVous
+    });
+  } catch (err) {
+    console.error('Error updating rendez-vous note:', err);
+    res.status(500).json({ 
+      message: 'Erreur lors de la modification de la note', 
+      error: err.message 
+    });
+  }
+};
+
+
 // Get all biological requests for a patient
 export const getBiologicalRequests = async (req, res) => {
   const medecinId = req.medecinId;

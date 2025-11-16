@@ -23,7 +23,7 @@ export const newPatient = async (req, res) => {
         phoneNumber,
         gender,
         poids: parseFloat(poids),
-        taille: parseInt(taille),
+        taille: Math.round(taille),
         dateOfBirth: new Date(dateOfBirth),
         bio: bio || null,
         ...(maladieChronique ? { maladieChronique } : {}),
@@ -1334,7 +1334,7 @@ export const getPatientProfile = async (req, res) => {
 export const updatePatient = async (req, res) => {
   const medecinId = req.medecinId;
   const patientId = req.params.id;
-  const { fullName, dateOfBirth, gender, phoneNumber, /* email, address, */ maladieChronique } = req.body;
+  const { fullName, dateOfBirth, gender, phoneNumber, /* email, address, */ maladieChronique, taille } = req.body;
 
   try {
     // Verify that patient belongs to this medecin
@@ -1366,7 +1366,8 @@ export const updatePatient = async (req, res) => {
         phoneNumber: phoneNumber || existingPatient.phoneNumber,
         // email: email || null,
         // address: address || null,
-        maladieChronique: maladieChronique || existingPatient.maladieChronique
+        maladieChronique: maladieChronique || existingPatient.maladieChronique,
+        taille: Math.round(taille) || existingPatient.taille
       },
       select: {
         id: true,
@@ -1377,6 +1378,7 @@ export const updatePatient = async (req, res) => {
         gender: true,
         dateOfBirth: true,
         maladieChronique: true,
+        taille: true,
         createdAt: true
       }
     });

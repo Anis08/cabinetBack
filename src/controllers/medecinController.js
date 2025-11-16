@@ -666,11 +666,15 @@ export const getCompletedAppointments = async (req, res) => {
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 7);
 
+    // Add month range
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+
     // Run all queries in parallel
     const [
       completedApointments,
       todayRevenue,
-      weekRevenue,
+      monthRevenue, // changed from weekRevenue
       avgPaid
     ] = await Promise.all([
       prisma.rendezVous.findMany({
@@ -726,8 +730,8 @@ export const getCompletedAppointments = async (req, res) => {
           medecinId,
           state: 'Completed',
           date: {
-            gte: weekStart,
-            lt: weekEnd
+            gte: monthStart,
+            lt: monthEnd
           }
         }
       }),
@@ -820,7 +824,7 @@ export const getCompletedAppointments = async (req, res) => {
     res.status(200).json({
       completedApointments: formattedAppointments,
       todayRevenue: todayRevenue._sum.paid || 0,
-      weekRevenue: weekRevenue._sum.paid || 0,
+      monthRevenue: monthRevenue._sum.paid || 0, // changed from weekRevenue
       averagePaid: Math.round(avgPaid._avg.paid) || 0
     });
   } catch (err) {

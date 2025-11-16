@@ -9,10 +9,11 @@ import { calculateBSA, enrichPatientWithCalculations, enrichVitalSignsWithBSA } 
 
 
 export const newPatient = async (req, res) => {
-  const medecinId = req.medecinId
-  const { fullName, phoneNumber, gender, poids, taille, dateOfBirth, bio, maladieChronique } = req.body;
+  const medecinId = req.medecinId;
+  const { fullName, phoneNumber, gender, poids, taille, dateOfBirth, bio, maladieChronique, add } = req.body;
+
   try {
-    if (!fullName || !phoneNumber || !gender || !dateOfBirth || !bio || !maladieChronique) {
+    if (!fullName || !phoneNumber || !gender || !dateOfBirth) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
@@ -24,10 +25,12 @@ export const newPatient = async (req, res) => {
         poids: parseFloat(poids),
         taille: parseInt(taille),
         dateOfBirth: new Date(dateOfBirth),
-        bio,
-        maladieChronique,
-        medecinId,
-      }, 
+        bio: bio || null,
+        ...(maladieChronique ? { maladieChronique } : {}),
+        medecin: {
+          connect: { id: medecinId }
+        }
+      },
       select: {
         id: true,
         fullName: true,
@@ -42,23 +45,37 @@ export const newPatient = async (req, res) => {
         rendezVous: {
           take: 1,
           where: { state: 'Completed' },
-          orderBy: {
-            date: 'desc'
-          }
+          orderBy: { date: 'desc' }
         }
       }
-    })
+    });
 
+    let rendezVous = null;
 
-    res.status(200).json({ patient });
-  } catch (err) {
+    if (add) {
+      rendezVous = await prisma.rendezVous.create({
+        data: {
+          date: new Date(new Date().toISOString().split('T')[0]),
+          patientId: patient.id,
+          medecinId,
+          state: 'Waiting',
+          arrivalTime: new Date(),
+        },
+        include: {
+          patient: true,
+        }
+      });
 
-    if (err.code === 'P2002') {
-      return res.status(409).json({ message: 'Patient with this phone number already exists' });
+      triggerWaitingLineUpdate();
     }
-    res.status(500).json({ message: 'Failed to create a patient', error: err.message });
+
+    res.status(200).json({ patient, rendezVous });
+
+  } catch (err) {
     console.error(err);
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
+
 }
 
 export const listPatients = async (req, res) => {
@@ -495,18 +512,18 @@ export const finishConsultation = async (req, res) => {
         paDiastolique: paDiastolique ? parseInt(paDiastolique) : null,
       },
       select: {
-          id: true,
-          startTime: true,
-          endTime: true,
-          date: true,
-          paid: true,
-          patient: {
-            select: {
-              fullName: true,
-              maladieChronique: true,
-            }
+        id: true,
+        startTime: true,
+        endTime: true,
+        date: true,
+        paid: true,
+        patient: {
+          select: {
+            fullName: true,
+            maladieChronique: true,
           }
         }
+      }
     });
 
 
@@ -575,15 +592,15 @@ export const removeFromWaitingQueue = async (req, res) => {
     });
 
     if (!rendezVous) {
-      return res.status(404).json({ 
-        message: 'Rendez-vous non trouvé ou n\'appartient pas à ce médecin' 
+      return res.status(404).json({
+        message: 'Rendez-vous non trouvé ou n\'appartient pas à ce médecin'
       });
     }
 
     // Vérifier que le rendez-vous est bien dans la file d'attente (Waiting)
     if (rendezVous.state !== 'Waiting') {
-      return res.status(400).json({ 
-        message: `Le rendez-vous doit être en attente pour être supprimé de la file. État actuel: ${rendezVous.state}` 
+      return res.status(400).json({
+        message: `Le rendez-vous doit être en attente pour être supprimé de la file. État actuel: ${rendezVous.state}`
       });
     }
 
@@ -612,7 +629,7 @@ export const removeFromWaitingQueue = async (req, res) => {
     // Trigger WebSocket update pour mettre à jour la file d'attente publique
     triggerWaitingLineUpdate();
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'Patient retiré de la file d\'attente et marqué comme consultation terminée',
       rendezVous: {
         id: completed.id,
@@ -626,9 +643,9 @@ export const removeFromWaitingQueue = async (req, res) => {
 
   } catch (err) {
     console.error('Error removing from waiting queue:', err);
-    res.status(500).json({ 
-      message: 'Erreur lors de la suppression de la file d\'attente', 
-      error: err.message 
+    res.status(500).json({
+      message: 'Erreur lors de la suppression de la file d\'attente',
+      error: err.message
     });
   }
 };
@@ -755,7 +772,7 @@ export const getCompletedAppointments = async (req, res) => {
       if (apt.patient.taille) vitalSigns.height = apt.patient.taille;
       if (apt.imc) vitalSigns.bmi = apt.imc;
       if (apt.pcm) vitalSigns.pcm = apt.pcm;
-      
+
       // Calculer et ajouter le BSA (Body Surface Area)
       const bsa = calculateBSA(apt.poids, apt.patient.taille);
       if (bsa) vitalSigns.bsa = bsa;
@@ -763,13 +780,13 @@ export const getCompletedAppointments = async (req, res) => {
       // Get biological tests for this patient around this consultation date
       const patientBioRequests = biologicalRequests.filter(br => br.patientId === apt.patient.id);
       const biologicalTests = [];
-      
+
       patientBioRequests.forEach(request => {
         request.requestedExams.forEach(exam => {
-          const status = request.status === 'Completed' ? 'reçue' : 
-                        request.status === 'EnCours' ? 'en attente' : 'demandée';
+          const status = request.status === 'Completed' ? 'reçue' :
+            request.status === 'EnCours' ? 'en attente' : 'demandée';
           const result = request.results && request.results[exam] ? request.results[exam] : null;
-          
+
           biologicalTests.push({
             test: exam,
             status: status,
@@ -933,7 +950,7 @@ export const getCompletedAppointmentsGrouped = async (req, res) => {
       if (apt.patient.taille) vitalSigns.height = apt.patient.taille;
       if (apt.imc) vitalSigns.bmi = apt.imc;
       if (apt.pcm) vitalSigns.pcm = apt.pcm;
-      
+
       // Calculer et ajouter le BSA (Body Surface Area)
       const bsa = calculateBSA(apt.poids, apt.patient.taille);
       if (bsa) vitalSigns.bsa = bsa;
@@ -941,13 +958,13 @@ export const getCompletedAppointmentsGrouped = async (req, res) => {
       // Get biological tests for this patient around this consultation date
       const patientBioRequests = biologicalRequests.filter(br => br.patientId === apt.patient.id);
       const biologicalTests = [];
-      
+
       patientBioRequests.forEach(request => {
         request.requestedExams.forEach(exam => {
-          const status = request.status === 'Completed' ? 'reçue' : 
-                        request.status === 'EnCours' ? 'en attente' : 'demandée';
+          const status = request.status === 'Completed' ? 'reçue' :
+            request.status === 'EnCours' ? 'en attente' : 'demandée';
           const result = request.results && request.results[exam] ? request.results[exam] : null;
-          
+
           biologicalTests.push({
             test: exam,
             status: status,
@@ -981,10 +998,10 @@ export const getCompletedAppointmentsGrouped = async (req, res) => {
     // Group appointments by date
     const grouped = formattedAppointments.reduce((acc, rdv) => {
       // Format date as YYYY-MM-DD for grouping
-      const dateKey = rdv.date instanceof Date 
+      const dateKey = rdv.date instanceof Date
         ? rdv.date.toISOString().split('T')[0]
         : new Date(rdv.date).toISOString().split('T')[0];
-      
+
       if (!acc[dateKey]) {
         acc[dateKey] = [];
       }
@@ -1076,7 +1093,7 @@ export const getHistory = async (req, res) => {
       if (apt.patient.taille) vitalSigns.height = apt.patient.taille;
       if (apt.imc) vitalSigns.bmi = apt.imc;
       if (apt.pcm) vitalSigns.pcm = apt.pcm;
-      
+
       // Calculer et ajouter le BSA (Body Surface Area)
       const bsa = calculateBSA(apt.poids, apt.patient.taille);
       if (bsa) vitalSigns.bsa = bsa;
@@ -1084,13 +1101,13 @@ export const getHistory = async (req, res) => {
       // Get biological tests for this patient
       const patientBioRequests = biologicalRequests.filter(br => br.patientId === apt.patient.id);
       const biologicalTests = [];
-      
+
       patientBioRequests.forEach(request => {
         request.requestedExams.forEach(exam => {
-          const status = request.status === 'Completed' ? 'reçue' : 
-                        request.status === 'EnCours' ? 'en attente' : 'demandée';
+          const status = request.status === 'Completed' ? 'reçue' :
+            request.status === 'EnCours' ? 'en attente' : 'demandée';
           const result = request.results && request.results[exam] ? request.results[exam] : null;
-          
+
           biologicalTests.push({
             test: exam,
             status: status,
@@ -1130,7 +1147,7 @@ export const getHistory = async (req, res) => {
 }
 
 
-export const addToWaitingListToday = async (req, res) =>  {
+export const addToWaitingListToday = async (req, res) => {
   const medecinId = req.medecinId;
   const { patientId } = req.body;
   try {
@@ -1364,9 +1381,9 @@ export const updatePatient = async (req, res) => {
       }
     });
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'Patient updated successfully',
-      patient: updatedPatient 
+      patient: updatedPatient
     });
   } catch (err) {
     if (err.code === 'P2002') {
@@ -1402,7 +1419,7 @@ export const deletePatient = async (req, res) => {
       }
     });
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'Patient deleted successfully',
       patientId: parseInt(patientId)
     });
@@ -1441,8 +1458,8 @@ export const updateRendezVousNote = async (req, res) => {
     });
 
     if (!existingRendezVous) {
-      return res.status(404).json({ 
-        message: 'Rendez-vous non trouvé ou n\'appartient pas à ce médecin' 
+      return res.status(404).json({
+        message: 'Rendez-vous non trouvé ou n\'appartient pas à ce médecin'
       });
     }
 
@@ -1471,15 +1488,15 @@ export const updateRendezVousNote = async (req, res) => {
       }
     });
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'Note du rendez-vous modifiée avec succès',
       rendezVous: updatedRendezVous
     });
   } catch (err) {
     console.error('Error updating rendez-vous note:', err);
-    res.status(500).json({ 
-      message: 'Erreur lors de la modification de la note', 
-      error: err.message 
+    res.status(500).json({
+      message: 'Erreur lors de la modification de la note',
+      error: err.message
     });
   }
 };
@@ -1488,7 +1505,7 @@ export const updateRendezVousNote = async (req, res) => {
 export const updateRendezVousVitalSigns = async (req, res) => {
   const medecinId = req.medecinId;
   const rendezVousId = req.params.rendezVousId;
-  const { paSystolique, paDiastolique, poids, imc, pcm, pulse} = req.body;
+  const { paSystolique, paDiastolique, poids, imc, pcm, pulse } = req.body;
 
   try {
     // Validate rendezVousId
@@ -1513,8 +1530,8 @@ export const updateRendezVousVitalSigns = async (req, res) => {
     });
 
     if (!existingRendezVous) {
-      return res.status(404).json({ 
-        message: 'Rendez-vous non trouvé ou n\'appartient pas à ce médecin' 
+      return res.status(404).json({
+        message: 'Rendez-vous non trouvé ou n\'appartient pas à ce médecin'
       });
     }
 
@@ -1525,11 +1542,11 @@ export const updateRendezVousVitalSigns = async (req, res) => {
       },
       data: {
         paSystolique: parseInt(paSystolique) || null,
-    paDiastolique: parseInt(paDiastolique) || null,
-    poids: parseFloat(poids) || null,
-    imc: parseFloat(imc) || null,
-    pcm: parseFloat(pcm) || null,
-    pulse: parseInt(pulse) || null, 
+        paDiastolique: parseInt(paDiastolique) || null,
+        poids: parseFloat(poids) || null,
+        imc: parseFloat(imc) || null,
+        pcm: parseFloat(pcm) || null,
+        pulse: parseInt(pulse) || null,
       },
       select: {
         id: true,
@@ -1554,15 +1571,15 @@ export const updateRendezVousVitalSigns = async (req, res) => {
       }
     });
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'Note du rendez-vous modifiée avec succès',
       rendezVous: updatedRendezVous
     });
   } catch (err) {
     console.error('Error updating rendez-vous note:', err);
-    res.status(500).json({ 
-      message: 'Erreur lors de la modification de la note', 
-      error: err.message 
+    res.status(500).json({
+      message: 'Erreur lors de la modification de la note',
+      error: err.message
     });
   }
 };
@@ -1754,7 +1771,7 @@ export const getAllAppointments = async (req, res) => {
       }
     });
 
-    res.status(200).json({ 
+    res.status(200).json({
       appointments: appointments.map(apt => ({
         id: apt.id,
         date: apt.date,
@@ -1870,7 +1887,7 @@ export const getStatistics = async (req, res) => {
     const returningPatients = allPatients.filter(p => p.rendezVous.length > 1).length;
     const malePatients = allPatients.filter(p => p.gender === 'Homme').length;
     const femalePatients = allPatients.filter(p => p.gender === 'Femme').length;
-    
+
     // Calculate age distribution
     const ageRanges = {
       '0-18': 0,
@@ -1879,7 +1896,7 @@ export const getStatistics = async (req, res) => {
       '51-65': 0,
       '65+': 0
     };
-    
+
     allPatients.forEach(patient => {
       const age = Math.floor((now - new Date(patient.dateOfBirth)) / (365.25 * 24 * 60 * 60 * 1000));
       if (age <= 18) ageRanges['0-18']++;
@@ -1908,8 +1925,8 @@ export const getStatistics = async (req, res) => {
     const consultationsWithDuration = completedAppointments.filter(apt => apt.startTime && apt.endTime);
     const avgDuration = consultationsWithDuration.length > 0
       ? Math.round(consultationsWithDuration.reduce((sum, apt) => {
-          return sum + (new Date(apt.endTime) - new Date(apt.startTime)) / (1000 * 60);
-        }, 0) / consultationsWithDuration.length)
+        return sum + (new Date(apt.endTime) - new Date(apt.startTime)) / (1000 * 60);
+      }, 0) / consultationsWithDuration.length)
       : 23;
 
     // Calculate financial statistics
@@ -1920,17 +1937,17 @@ export const getStatistics = async (req, res) => {
         return aptDate >= today && aptDate < new Date(today.getTime() + 24 * 60 * 60 * 1000);
       })
       .reduce((sum, apt) => sum + (apt.paid || 0), 0);
-    
-    const avgRevenuePerConsultation = totalCompletedConsultations > 0 
-      ? totalRevenue / totalCompletedConsultations 
+
+    const avgRevenuePerConsultation = totalCompletedConsultations > 0
+      ? totalRevenue / totalCompletedConsultations
       : 0;
-    
-    const avgRevenuePerPatient = totalPatients > 0 
-      ? totalRevenue / totalPatients 
+
+    const avgRevenuePerPatient = totalPatients > 0
+      ? totalRevenue / totalPatients
       : 0;
 
     // Calculate no-show rate
-    const scheduledAppointments = allAppointments.filter(apt => 
+    const scheduledAppointments = allAppointments.filter(apt =>
       apt.state === 'Scheduled' && new Date(apt.date) < today
     );
     const noShowRate = allAppointments.length > 0
@@ -1938,7 +1955,7 @@ export const getStatistics = async (req, res) => {
       : 0;
 
     // Calculate fidélisation rate
-    const fidelizationRate = totalPatients > 0 
+    const fidelizationRate = totalPatients > 0
       ? Math.round((returningPatients / totalPatients) * 100)
       : 0;
 
@@ -2022,7 +2039,7 @@ export const getStatistics = async (req, res) => {
 // Get Dashboard KPIs
 export const getDashboardKPIs = async (req, res) => {
   const medecinId = req.medecinId;
-  
+
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -2067,14 +2084,14 @@ export const getDashboardKPIs = async (req, res) => {
     // Calculate KPIs
     const patientsToday = todayAppointments.length;
     const patientsYesterday = yesterdayAppointments.length;
-    
+
     const waiting = todayAppointments.filter(apt => apt.state === 'Waiting').length;
     const inProgress = todayAppointments.filter(apt => apt.state === 'InProgress').length;
     const completed = todayAppointments.filter(apt => apt.state === 'Completed').length;
     const completedYesterday = yesterdayAppointments.filter(apt => apt.state === 'Completed').length;
 
-    
- 
+
+
 
 
 

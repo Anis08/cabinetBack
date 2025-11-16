@@ -81,7 +81,7 @@ model RendezVous {
   paSystolique  Int?
   paDiastolique Int?
 
-  patient     Patient       @relation(fields: [patientId], references: [id])
+  patient     Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
   medecin     Medecin       @relation(fields: [medecinId], references: [id])
   ordonnances Ordonnance[]
 

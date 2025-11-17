@@ -26,7 +26,9 @@ import {
   returnToAbsent,
   removeFromWaitingQueue,
   updateRendezVousNote,
-  updateRendezVousVitalSigns
+  updateRendezVousVitalSigns,
+  rescheduleAppointment,
+  deleteAppointment
 } from '../controllers/medecinController.js';
 import { verifyAccessToken } from '../middleware/verifyAccessToken.js';
 import { PrismaClient } from '@prisma/client';
@@ -64,6 +66,8 @@ router.put('/rendez-vous/:rendezVousId/note', verifyAccessToken, updateRendezVou
 
 router.put('/rendez-vous/:rendezVousId/vital-signs', verifyAccessToken, updateRendezVousVitalSigns);
 
+router.put('/rendez-vous/reschedule', verifyAccessToken, rescheduleAppointment);
+router.delete('/rendez-vous/delete/:rendezVousId', verifyAccessToken, deleteAppointment)
 // Biological request routes
 router.get('/biological-requests/:patientId', verifyAccessToken, getBiologicalRequests);
 router.post('/biological-requests', verifyAccessToken, createBiologicalRequest);

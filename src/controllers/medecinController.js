@@ -2134,3 +2134,114 @@ export const getDashboardKPIs = async (req, res) => {
     console.error(err);
   }
 };
+
+// Reschedule an appointment (only if it's scheduled, not today, and not in the past)
+export const rescheduleAppointment = async (req, res) => {
+  const medecinId = req.medecinId;
+  const { rendezVousId, newDate, patientId, oldDate } = req.body;
+
+  try {
+    if (!rendezVousId || !newDate || !patientId) {
+      return res.status(400).json({ message: 'Rendez-vous ID and new date are required' });
+    }
+
+    // Find the appointment
+    const rendezVous = await prisma.rendezVous.findFirst({
+      where: {
+        id: parseInt(rendezVousId),
+        medecinId,
+        patientId: parseInt(patientId),
+        state: 'Scheduled'
+      }
+    });
+
+    if (!rendezVous) {
+      return res.status(404).json({ message: 'Rendez-vous not found or not eligible for rescheduling' });
+    }
+
+    if (new Date(newDate).toISOString().split('T')[0] === new Date(oldDate).toISOString().split('T')[0]) {
+      return res.status(400).json({ message: 'New date must be different from the old date' });
+    }
+
+    function toUTCDate(date) {
+  const d = new Date(date);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+const todayUTC = toUTCDate(new Date());
+const rdvUTC = toUTCDate(rendezVous.date);
+
+if (rdvUTC <= todayUTC) {
+  return res.status(400).json({ message: 'Cannot reschedule appointments for today or in the past' });
+}
+
+    const newDateObj = new Date(newDate);
+    newDateObj.setHours(0, 0, 0, 0);
+
+    if (isNaN(newDateObj.getTime()) || newDateObj <= todayUTC) {
+      return res.status(400).json({ message: 'New date must be in the future' });
+    }
+
+    const resetDate = newDateObj.toISOString().split('T')[0];
+
+    // Update the appointment date
+    const updatedRendezVous = await prisma.rendezVous.update({
+      where: { id: parseInt(rendezVousId) },
+      data: { date: new Date(resetDate) },
+      select: {
+        id: true,
+        date: true,
+        state: true,
+        patientId: true,
+        medecinId: true
+      }
+    });
+
+    res.status(200).json({
+      message: 'Appointment rescheduled successfully',
+      rendezVous: updatedRendezVous
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to reschedule appointment', error: err.message });
+    console.error(err);
+  }
+};
+
+
+
+export const deleteAppointment = async (req, res) => {
+  const medecinId = req.medecinId;
+  const rendezVousId = req.params.rendezVousId;
+
+  try {
+    if(!rendezVousId) {
+      return res.status(400).json({ message: 'Rendez-vous ID is required' });
+    }
+
+    // Verify that the appointment exists and belongs to this medecin
+    const existingRendezVous = await prisma.rendezVous.findFirst({
+      where: {
+        id: parseInt(rendezVousId),
+        medecinId
+      }
+    });
+
+    if (!existingRendezVous) {
+      return res.status(404).json({ message: 'Rendez-vous not found or access denied' });
+    }
+
+    // Delete the appointment
+    await prisma.rendezVous.delete({
+      where: {
+        id: parseInt(rendezVousId)
+      }
+    });
+
+    res.status(200).json({
+      message: 'Rendez-vous deleted successfully',
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete rendez-vous', error: err.message });
+    console.error(err);
+  }
+}

@@ -2249,3 +2249,28 @@ export const deleteAppointment = async (req, res) => {
     console.error(err);
   }
 }
+
+export const getCurrentAppointment = async (req, res) => {
+  const medecinId = req.medecinId;
+  try {
+    const currentAppointment = await prisma.rendezVous.findFirst({
+      where: {
+        medecinId,
+        state: "InProgress"
+    },
+  include: {
+    patient: true
+  }
+  });
+
+    if (!currentAppointment) {
+      return res.status(404).json({ message: "No current appointment found" });
+    }
+
+    res.status(200).json({ currentAppointment });
+  }
+  catch (err) {
+    res.status(500).json({ message: "Failed to get current appointment", error: err.message });
+    console.error(err);
+  }
+}

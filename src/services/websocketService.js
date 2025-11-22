@@ -1,7 +1,5 @@
 import { Server } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from "../prisma.js";
 let io = null;
 
 /**
@@ -125,6 +123,38 @@ const getWaitingLineData = async () => {
   }
 };
 
+
+const getCurrentPatient = async () => {
+  try {
+  
+
+    // Get current patient (InProgress)
+    const currentAppointment = await prisma.rendezVous.findFirst({
+      where: {
+        state: 'InProgress'
+      },
+      include: {
+        patient: true
+          
+      },
+      orderBy: {
+        startTime: 'asc'
+      }
+    });
+
+    
+
+  
+
+    return currentAppointment
+
+  } catch (error) {
+    console.error('Error fetching current appoihntment data:', error);
+    return null;
+  }
+};
+
+
 /**
  * Send waiting line update to all connected clients
  */
@@ -142,11 +172,29 @@ export const sendWaitingLineUpdate = async () => {
   }
 };
 
+export const sendCurrentAppointment = async () => {
+  if (!io) {
+    console.warn('WebSocket not initialized');
+    return;
+  }
+
+  const data = await getCurrentPatient();
+  
+  if (data) {
+    io.emit('patientInConsultation', data);
+    console.log(`Waiting line update sent: waiting, current: ${data.currentAppointment ? data.currentAppointment : 'none'}`);
+  }
+};
+
 /**
  * Trigger waiting line update (call this when appointments change)
  */
 export const triggerWaitingLineUpdate = () => {
   sendWaitingLineUpdate();
+};
+
+export const triggerCurrentPatientUpdate = () => {
+  sendCurrentAppointment();
 };
 
 /**

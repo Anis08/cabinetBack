@@ -29,7 +29,8 @@ import {
   updateRendezVousVitalSigns,
   rescheduleAppointment,
   deleteAppointment,
-  getCurrentAppointment
+  getCurrentAppointment,
+  saveAppointmentInfo
 } from '../controllers/medecinController.js';
 import { verifyAccessToken } from '../middleware/verifyAccessToken.js';
 import { PrismaClient } from '@prisma/client';
@@ -61,6 +62,8 @@ router.get('/test', test)
 // Patient management routes
 router.put('/patients/:id', verifyAccessToken, updatePatient);
 router.delete('/patients/:id', verifyAccessToken, deletePatient);
+
+router.post('/save-appointment-info', verifyAccessToken, saveAppointmentInfo);
 
 // Rendez-vous management routes
 router.put('/rendez-vous/:rendezVousId/note', verifyAccessToken, updateRendezVousNote);

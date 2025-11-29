@@ -336,7 +336,7 @@ export const returnToQueue = async (req, res) => {
 
     // Trigger WebSocket update for public waiting line
     triggerWaitingLineUpdate();
-    triggerCurrentPatientUpdate();
+    triggerCurrentPatientUpdate(medecinId);
 
     res.status(200).json({ state: 'Waiting' });
   } catch (err) {
@@ -439,7 +439,7 @@ export const addToInProgress = async (req, res) => {
 
     // Trigger WebSocket update for public waiting line
     triggerWaitingLineUpdate();
-    triggerCurrentPatientUpdate();
+    triggerCurrentPatientUpdate(medecinId);
 
     res.status(200).json({ state: 'InProgress' });
   } catch (err) {
@@ -504,14 +504,7 @@ export const finishConsultation = async (req, res) => {
       data: {
         state: 'Completed',
         endTime: new Date(),
-        paid: parseInt(paye),
-        note: note || null,
-        poids: poids ? parseFloat(poids) : null,
-        pcm: pcm ? parseFloat(pcm) : null,
-        imc: imc ? parseFloat(imc) : null,
-        pulse: pulse ? parseInt(pulse) : null,
-        paSystolique: paSystolique ? parseInt(paSystolique) : null,
-        paDiastolique: paDiastolique ? parseInt(paDiastolique) : null,
+        paid: rendezVous.paid ?? parseInt(paye),
       },
       select: {
         id: true,
@@ -557,7 +550,7 @@ export const finishConsultation = async (req, res) => {
 
     // Trigger WebSocket update for public waiting line
     triggerWaitingLineUpdate();
-    triggerCurrentPatientUpdate();
+    triggerCurrentPatientUpdate(medecinId);
 
     res.status(200).json({ message: 'Consultation finished', completed });
 
@@ -2263,14 +2256,93 @@ export const getCurrentAppointment = async (req, res) => {
   }
   });
 
-    if (!currentAppointment) {
-      return res.status(404).json({ message: "No current appointment found" });
-    }
+  const waitingLine = await prisma.rendezVous.findMany({
+    where: {
+      medecinId,
+      state: "Waiting",
+      date: currentAppointment ? currentAppointment.date : undefined
+    },
+    orderBy: {
+      arrivalTime: "asc"
+    },
+    take: 3,
+  include: {
+    patient: true
+  }
+  })
 
-    res.status(200).json({ currentAppointment });
+
+    res.status(200).json({ currentAppointment, waitingLine });
   }
   catch (err) {
     res.status(500).json({ message: "Failed to get current appointment", error: err.message });
+    console.error(err);
+  }
+}
+
+
+export const saveAppointmentInfo = async (req, res) => {
+  const medecinId = req.medecinId
+  const { rendezVousId, paye, note, poids, pcm, imc, pulse, paSystolique, paDiastolique } = req.body;
+
+  try {
+    if (!rendezVousId || paye == null || !medecinId) {
+      console.log(rendezVousId, paye, medecinId);
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    const rendezVous = await prisma.rendezVous.findUnique({
+      where: {
+        id: rendezVousId,
+      }
+    });
+
+    if (!rendezVous || rendezVous.state !== 'InProgress' || rendezVous.medecinId !== medecinId) {
+      return res.status(404).json({ message: 'Rendez-vous not found' });
+    }
+
+    if (new Date(rendezVous.date).toISOString() !== new Date().toISOString().split('T')[0] + "T00:00:00.000Z") {
+      return res.status(404).json({ message: 'Only today\'s appointments can be finished' });
+    }
+
+    const updatedAppointment = await prisma.rendezVous.update({
+      where: {
+        id: rendezVousId,
+      },
+      data: {
+        paid: parseInt(paye),
+        note: note || null,
+        poids: poids ? parseFloat(poids) : null,
+        pcm: pcm ? parseFloat(pcm) : null,
+        imc: imc ? parseFloat(imc) : null,
+        pulse: pulse ? parseInt(pulse) : null,
+        paSystolique: paSystolique ? parseInt(paSystolique) : null,
+        paDiastolique: paDiastolique ? parseInt(paDiastolique) : null,
+      },
+      select: {
+        id: true,
+        startTime: true,
+        endTime: true,
+        date: true,
+        paid: true,
+        state: true,
+        note: true,
+        poids: true,
+        pcm: true,
+        imc: true,
+        pulse: true,
+        paSystolique: true,
+        paDiastolique: true,
+        patient: true
+      }
+    });
+
+
+    res.status(200).json({ updatedAppointment });
+
+  }
+  catch (err) {
+    res.status(500).json({ message: 'Failed to finish consultation', error: err.message });
     console.error(err);
   }
 }
